@@ -50,14 +50,16 @@ DEFAULT_MODES = [
     ("Bus", "🚌", 90, "UBA Linienbus Nahverkehr", 0),
     ("Bus + Bahn", "🚌🚆", 67,
      "Annahme je halbe Strecke: UBA Linienbus Nahverkehr 90 und Eisenbahn Nahverkehr 44", 0),
-    ("Auto (Verbrenner)", "🚗", 164, "UBA Pkw (Ø 1,4 Personen/Pkw)", 1),
+    ("Auto (Verbrenner)", "🚗", 230,
+     "Alleinfahrt, abgeleitet: UBA Pkw 164 g/Pkm × 1,4 Pers./Pkw", 1),
     ("E-Auto", "🔌", 70, "UBA Elektro-Pkw", 0),
     ("Fahrgemeinschaft Auto", "🚗👥", 115,
-     "Abgeleitet: UBA Pkw 164 × 1,4 Pers. ÷ 2 Pers.", 0),
+     "Abgeleitet: Alleinfahrt 230 ÷ 2 Pers.", 0),
     ("Fahrgemeinschaft E-Auto", "🔌👥", 49,
      "Abgeleitet: UBA Elektro-Pkw 70 × 1,4 Pers. ÷ 2 Pers.", 0),
-    ("Motorrad/Roller", "🏍️", 100,
-     "PLATZHALTER – kein UBA-Wert verifiziert, bitte prüfen", 0),
+    ("Motorrad/Roller", "🏍️", 140,
+     "Abgeleitet: UK DESNZ 2024 Motorrad Ø 114 g/km direkt + ca. 25 % Vorkette"
+     " (Schätzung), 1 Person", 0),
 ]
 
 # Name, Gesamtstrecke hin + zurück in km (einfache Strecke × 2)

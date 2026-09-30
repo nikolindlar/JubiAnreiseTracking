@@ -73,8 +73,8 @@ def test_arrival_aggregates_without_storing_name(app, client):
     d = client.get("/api/uebersicht").get_json()
     assert d["today"]["trips"] == 2
     assert d["today"]["km"] == 30
-    assert d["today"]["co2_g"] == pytest.approx(20 * 164)
-    assert d["today"]["baseline_g"] == pytest.approx(30 * 164)
+    assert d["today"]["co2_g"] == pytest.approx(20 * 230)
+    assert d["today"]["baseline_g"] == pytest.approx(30 * 230)
 
     # Datenbank enthält keine Einzelbuchungen mit Personenbezug
     from anreise.app import get_db
@@ -138,5 +138,5 @@ def test_csv_export(app, client):
     set_distance(client, csrf, 1, "Niko", "10")
     client.post("/api/anreise", json={"employee_id": 1, "mode_id": mode_id(app, "E-Auto")})
     body = client.get("/verwaltung/export.csv").get_data(as_text=True)
-    assert "2026-10-01;E-Auto;1;10,0;0,70;1,64" in body
+    assert "2026-10-01;E-Auto;1;10,0;0,70;2,30" in body
     assert "Niko" not in body

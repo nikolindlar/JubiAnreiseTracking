@@ -42,14 +42,15 @@ g CO₂-Äquivalente pro Personenkilometer inkl. Energievorkette.
 | Fahrrad/E-Bike | 0 | keine direkten Emissionen, E-Bike-Strom vernachlässigt |
 | Bus | 90 | UBA Linienbus Nahverkehr |
 | Bus + Bahn | 67 | **Annahme:** je halbe Strecke Bus (90) und Eisenbahn Nahverkehr (44) |
-| Auto (Verbrenner) | 164 | UBA Pkw (Ø 1,4 Personen/Pkw) |
+| Auto (Verbrenner) | 230 | **abgeleitet, Alleinfahrt:** UBA Pkw 164 g/Pkm × 1,4 Personen/Pkw |
 | E-Auto | 70 | UBA Elektro-Pkw |
-| Fahrgemeinschaft Auto | 115 | **abgeleitet:** 164 × 1,4 ÷ 2 Personen |
+| Fahrgemeinschaft Auto | 115 | **abgeleitet:** 230 ÷ 2 Personen |
 | Fahrgemeinschaft E-Auto | 49 | **abgeleitet:** 70 × 1,4 ÷ 2 Personen |
-| Motorrad/Roller | 100 | **Platzhalter, kein verifizierter UBA-Wert** |
+| Motorrad/Roller | 140 | **abgeleitet, kein UBA-Wert:** UK DESNZ 2024 Motorrad-Durchschnitt 114 g/km (nur direkte Emissionen) + ca. 25 % Vorkette (eigene Schätzung), 1 Person. Nur Roller < 125 cm³: ca. 105 (DESNZ klein 83 g/km + 25 %) |
 
-Hinweis: Der UBA-Pkw-Wert unterstellt 1,4 Personen pro Auto. Für allein fahrende
-Pendler ist der tatsächliche Wert höher (rund 164 × 1,4 ≈ 230 g/Pkm).
+Hinweis: Der UBA-Pkw-Wert (164 g/Pkm) unterstellt 1,4 Personen pro Auto. Da Pendler
+meist allein fahren, wird er auf eine Person umgerechnet (164 × 1,4 ≈ 230 g/Pkm).
+Dieser Wert gilt auch für den Vergleichsbalken „alle mit dem Auto“.
 
 ## Installation auf dem Raspberry Pi
 
@@ -93,7 +94,7 @@ Verwaltung ankommen.
    (jeweils hin + zurück). Diese Startwerte werden nur beim allerersten Start mit leerer
    Datenbank übernommen; spätere Änderungen erfolgen in der Verwaltung.
    Personen ohne Strecke erscheinen nicht auf dem Tablet.
-3. Die Faktoren prüfen, insbesondere Motorrad/Roller.
+3. Die Faktoren prüfen.
 
 ## Entwicklung
 
