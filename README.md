@@ -15,8 +15,12 @@ den CO₂-Ausstoß pro Tag und Jahr im Empfangsbereich an.
   Verkehrsmittel nur **Summen**: Anzahl Anreisen, km, CO₂ und Vergleichswert.
 - **Nicht gespeichert:** wer an welchem Tag womit gekommen ist. Der angetippte
   Name wird nur benutzt, um die Strecke nachzuschlagen, und dann verworfen.
-  Es gibt keine Einzelbuchungen, auch nicht vorübergehend. Der Server schreibt
-  keine Zugriffsprotokolle.
+  Es gibt keine Einzelbuchungen in der Datenbank. Der Server schreibt keine
+  Zugriffsprotokolle.
+- **Storno:** Damit eine Buchung 20 Sekunden lang rückgängig gemacht werden kann, hält der
+  Server nur im Arbeitsspeicher eine zufällige Storno-Marke mit Tag, Verkehrsmittel, km und
+  CO₂-Werten, ohne Name. Die Marke verfällt nach 30 Sekunden (20 s plus Puffer für die
+  Übertragung) und geht bei einem Neustart verloren.
 - **Einschränkung:** Bei wenigen Personen lassen sich aus den Summen Rückschlüsse ziehen,
   zum Beispiel wenn jemand die Übersicht direkt nach einer Buchung beobachtet oder
   nur eine Person mit dem Motorrad kommt.
@@ -88,8 +92,11 @@ hinzufügen“ und Android-Bildschirmfixierung („App anpinnen“) nutzen.
 Beim ersten Aufruf fragt die Seite nach dem Erfassungspasswort. Danach bleibt das Tablet
 angemeldet, solange die Browserdaten (Cookies) nicht gelöscht werden.
 
-Die Erfassungsseite kehrt nach jeder Buchung bzw. nach 20 s Inaktivität zur
-Namensauswahl zurück und lädt sich alle 15 Minuten neu, damit Änderungen aus der
+Ablauf am Tablet: Name antippen → Verkehrsmittel antippen (mit „← Zurück“ geht es zur
+Namensauswahl, falls die falsche Person gewählt wurde) → Bestätigung mit Knopf
+„Rückgängig? 20 s“. Der Countdown läuft ab, bei 0 s erscheint wieder die Namensauswahl.
+Ein Tipp auf den Knopf storniert die Buchung. Auf der Verkehrsmittel-Seite geht es nach
+20 s ohne Eingabe ebenfalls zurück zur Namensauswahl. Die Seite und lädt sich alle 15 Minuten neu, damit Änderungen aus der
 Verwaltung ankommen.
 
 ## Erste Schritte nach der Installation

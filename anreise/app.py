@@ -3,6 +3,7 @@ import io
 import csv
 import os
 import secrets
+import threading
 import time
 from datetime import date, timedelta
 from functools import wraps
@@ -23,6 +24,10 @@ def create_app(config=None):
         # Tablets bleiben lange angemeldet, die Verwaltung nur ADMIN_SESSION_HOURS
         PERMANENT_SESSION_LIFETIME=timedelta(days=400),
         ADMIN_SESSION_HOURS=12,
+        # Storno-Fenster auf dem Tablet (Countdown) und serverseitige Frist
+        # mit etwas Puffer für die Übertragung
+        UNDO_SECONDS=20,
+        UNDO_GRACE_SECONDS=10,
         SESSION_COOKIE_SAMESITE="Lax",
         TODAY=date.today,  # überschreibbar für Tests
     )
@@ -33,6 +38,10 @@ def create_app(config=None):
 
     with app.app_context():
         db.init_db(get_db())
+
+    # Storno-Marken nur im Arbeitsspeicher: Marke -> addierte Werte (ohne Name),
+    # verfallen nach wenigen Sekunden und gehen bei einem Neustart verloren.
+    app.extensions["anreise_undo"] = {"lock": threading.Lock(), "tokens": {}}
 
     app.teardown_appcontext(close_db)
     register_routes(app)
@@ -172,9 +181,29 @@ def register_routes(app):
             mode_id = int(data["mode_id"])
         except (KeyError, TypeError, ValueError):
             return jsonify(ok=False), 400
-        if not db.record_arrival(get_db(), today().isoformat(), employee_id, mode_id):
+        entry = db.record_arrival(get_db(), today().isoformat(), employee_id, mode_id)
+        if entry is None:
             return jsonify(ok=False), 400
-        return jsonify(ok=True)
+        undo = app.extensions["anreise_undo"]
+        token = secrets.token_urlsafe(16)
+        now = time.monotonic()
+        with undo["lock"]:
+            for t in [t for t, (exp, _) in undo["tokens"].items() if exp < now]:
+                del undo["tokens"][t]
+            undo["tokens"][token] = (
+                now + app.config["UNDO_SECONDS"] + app.config["UNDO_GRACE_SECONDS"], entry)
+        return jsonify(ok=True, undo_token=token, undo_seconds=app.config["UNDO_SECONDS"])
+
+    @app.post("/api/anreise/storno")
+    @kiosk_required
+    def api_arrival_undo():
+        token = str((request.get_json(silent=True) or {}).get("undo_token", ""))
+        undo = app.extensions["anreise_undo"]
+        with undo["lock"]:
+            expires, entry = undo["tokens"].pop(token, (0, None))
+        if entry is None or expires < time.monotonic():
+            return jsonify(ok=False), 410
+        return jsonify(ok=db.revert_arrival(get_db(), entry))
 
     # ---------- Verwaltung ----------
     @app.route("/verwaltung/login", methods=["GET", "POST"])

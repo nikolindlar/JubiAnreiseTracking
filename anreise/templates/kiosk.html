@@ -27,6 +27,7 @@
 
   <section id="step-done" hidden>
     <h1 id="done-text">Danke!</h1>
+    <button class="undo" id="undo" hidden>Rückgängig? <span id="undo-count">20</span> s</button>
   </section>
 </main>
 
@@ -37,15 +38,36 @@
     mode: document.getElementById('step-mode'),
     done: document.getElementById('step-done')
   };
-  var employeeId = null, resetTimer = null;
+  var doneText = document.getElementById('done-text');
+  var undoBtn = document.getElementById('undo');
+  var undoCount = document.getElementById('undo-count');
+  var employeeId = null, busy = false, resetTimer = null, countdown = null, undoToken = null;
 
-  function show(step) {
+  function show(step, delay) {
     Object.keys(steps).forEach(function (k) { steps[k].hidden = (k !== step); });
     clearTimeout(resetTimer);
+    clearInterval(countdown);
     // Nach Inaktivität bzw. Bestätigung zurück zur Namensauswahl
-    if (step !== 'name') resetTimer = setTimeout(reset, step === 'done' ? 2500 : 20000);
+    if (step !== 'name') resetTimer = setTimeout(reset, delay || 20000);
   }
-  function reset() { employeeId = null; show('name'); }
+  function reset() {
+    employeeId = null; undoToken = null; busy = false;
+    undoBtn.hidden = true;
+    show('name');
+  }
+  function message(text, isError, delay) {
+    doneText.textContent = text;
+    steps.done.classList.toggle('error', !!isError);
+    undoBtn.hidden = true;
+    show('done', delay);
+  }
+  function post(url, data) {
+    return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+      .then(function (r) {
+        if (r.status === 401) { location.href = '/erfassung/login'; return null; }
+        return r.json().then(function (j) { j.ok = r.ok && j.ok; return j; }, function () { return { ok: false }; });
+      }, function () { return { ok: false }; });
+  }
 
   steps.name.querySelectorAll('.tile').forEach(function (b) {
     b.addEventListener('click', function () {
@@ -58,21 +80,41 @@
 
   steps.mode.querySelectorAll('.tile').forEach(function (b) {
     b.addEventListener('click', function () {
+      if (busy) return;
       if (!employeeId) return reset();
-      var body = JSON.stringify({ employee_id: employeeId, mode_id: b.dataset.id });
-      employeeId = null;
-      fetch('/api/anreise', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body })
-        .then(function (r) {
-          if (r.status === 401) { location.href = '/erfassung/login'; return null; }
-          return r.ok;
-        }, function () { return false; })
-        .then(function (ok) {
-          if (ok === null) return;
-          var t = document.getElementById('done-text');
-          t.textContent = ok ? 'Danke, ist gespeichert! 🌱' : 'Speichern fehlgeschlagen – bitte nochmal versuchen.';
-          steps.done.classList.toggle('error', !ok);
-          show('done');
-        });
+      busy = true;
+      post('/api/anreise', { employee_id: employeeId, mode_id: b.dataset.id }).then(function (res) {
+        busy = false;
+        employeeId = null;
+        if (!res) return;
+        if (!res.ok) return message('Speichern fehlgeschlagen – bitte nochmal versuchen.', true, 5000);
+        doneText.textContent = 'Danke, ist gespeichert! 🌱';
+        steps.done.classList.remove('error');
+        undoToken = res.undo_token;
+        var left = res.undo_seconds || 20;
+        undoCount.textContent = left;
+        undoBtn.hidden = false;
+        show('done', left * 1000);
+        countdown = setInterval(function () {
+          left -= 1;
+          undoCount.textContent = Math.max(left, 0);
+        }, 1000);
+      });
+    });
+  });
+
+  undoBtn.addEventListener('click', function () {
+    if (!undoToken || busy) return;
+    busy = true;
+    var token = undoToken;
+    undoToken = null;
+    clearTimeout(resetTimer);
+    clearInterval(countdown);
+    post('/api/anreise/storno', { undo_token: token }).then(function (res) {
+      busy = false;
+      if (!res) return;
+      if (res.ok) message('Eintrag wurde storniert.', false, 3000);
+      else message('Stornieren nicht mehr möglich.', true, 4000);
     });
   });
 
