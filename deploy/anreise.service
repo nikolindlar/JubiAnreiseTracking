@@ -1,0 +1,16 @@
+[Unit]
+Description=Anreise CO2-Erfassung
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=anreise
+Group=anreise
+WorkingDirectory=/opt/anreise
+EnvironmentFile=/etc/anreise.env
+Environment=TZ=Europe/Berlin
+ExecStart=/opt/anreise/.venv/bin/python run.py
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

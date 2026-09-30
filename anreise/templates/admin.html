@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Verwaltung{% endblock %}
+{% block bodyclass %}admin{% endblock %}
+{% block body %}
+<main>
+  <header class="admin-head">
+    <h1>Verwaltung</h1>
+    <nav>
+      <a href="{{ url_for('dashboard') }}">Übersicht</a>
+      <a href="{{ url_for('kiosk') }}">Erfassung</a>
+      <a href="{{ url_for('export_csv') }}">CSV-Export</a>
+      <form method="post" action="{{ url_for('logout') }}"><button>Abmelden</button></form>
+    </nav>
+  </header>
+
+  <h2>Mitarbeitende</h2>
+  <p class="hint">Strecke = Gesamtstrecke Hin- und Rückweg in km. Nur aktive Personen mit Strecke &gt; 0 erscheinen auf dem Tablet.</p>
+  <table>
+    <tr><th>Name</th><th>Strecke (km, hin+zurück)</th><th>Aktiv</th><th></th></tr>
+    {% for e in employees %}
+    {% set f = 'emp-%d' % e.id %}
+    <tr class="{{ 'missing' if e.distance_km <= 0 }}">
+      <td><form id="{{ f }}" method="post" action="{{ url_for('employee_update', emp_id=e.id) }}">
+          <input type="hidden" name="csrf" value="{{ csrf }}"></form>
+        <input form="{{ f }}" name="name" value="{{ e.name }}" required></td>
+      <td><input form="{{ f }}" name="distance_km" value="{{ '%g' % e.distance_km }}" inputmode="decimal" size="6">
+        {% if e.distance_km <= 0 %}<span class="warn">Strecke fehlt</span>{% endif %}</td>
+      <td><input form="{{ f }}" type="checkbox" name="active" {{ 'checked' if e.active }}></td>
+      <td>
+        <button form="{{ f }}" name="action" value="save">Speichern</button>
+        <button form="{{ f }}" name="action" value="delete" class="danger"
+                onclick="return confirm('{{ e.name }} wirklich löschen? Bereits erfasste Summen bleiben erhalten.')">Löschen</button>
+      </td>
+    </tr>
+    {% endfor %}
+    <tr>
+      <td><form id="emp-new" method="post" action="{{ url_for('employee_add') }}">
+          <input type="hidden" name="csrf" value="{{ csrf }}"></form>
+        <input form="emp-new" name="name" placeholder="Neuer Name" required></td>
+      <td><input form="emp-new" name="distance_km" placeholder="km" inputmode="decimal" size="6"></td>
+      <td></td>
+      <td><button form="emp-new">Hinzufügen</button></td>
+    </tr>
+  </table>
+
+  <h2>Verkehrsmittel &amp; Emissionsfaktoren</h2>
+  <p class="hint">Faktor in g CO₂-Äquivalente pro Personenkilometer. Änderungen gelten nur für neue Anreisen – bereits erfasste Werte bleiben unverändert.
+    „Vergleich“ markiert das Verkehrsmittel für den Balken „alle mit dem Auto“.</p>
+  <table>
+    <tr><th>Symbol</th><th>Bezeichnung</th><th>g/Pkm</th><th>Quelle / Notiz</th><th>Aktiv</th><th>Vergleich</th><th></th></tr>
+    {% for m in modes %}
+    {% set f = 'mode-%d' % m.id %}
+    <tr>
+      <td><form id="{{ f }}" method="post" action="{{ url_for('mode_update', mode_id=m.id) }}">
+          <input type="hidden" name="csrf" value="{{ csrf }}"></form>
+        <input form="{{ f }}" name="icon" value="{{ m.icon }}" size="3"></td>
+      <td><input form="{{ f }}" name="label" value="{{ m.label }}" required></td>
+      <td><input form="{{ f }}" name="factor_g" value="{{ '%g' % m.factor_g }}" inputmode="decimal" size="5"></td>
+      <td><input form="{{ f }}" name="source" value="{{ m.source }}" size="28"></td>
+      <td><input form="{{ f }}" type="checkbox" name="active" {{ 'checked' if m.active }}></td>
+      <td><input form="{{ f }}" type="checkbox" name="is_baseline" {{ 'checked' if m.is_baseline }}></td>
+      <td><button form="{{ f }}">Speichern</button></td>
+    </tr>
+    {% endfor %}
+  </table>
+</main>
+{% endblock %}

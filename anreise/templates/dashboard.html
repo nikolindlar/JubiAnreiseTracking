@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}CO₂ unserer Anreise{% endblock %}
+{% block bodyclass %}dashboard{% endblock %}
+{% block body %}
+<main>
+  <h1>CO₂ unserer Anreise</h1>
+  <div class="panels">
+    <section class="panel" id="p-today">
+      <h2>Heute <small class="date"></small></h2>
+      <div class="bars"></div>
+      <p class="meta"></p>
+    </section>
+    <section class="panel" id="p-year">
+      <h2>Jahr <small class="date"></small></h2>
+      <div class="bars"></div>
+      <p class="meta"></p>
+    </section>
+  </div>
+  <p class="legend"><span class="sw actual"></span> tatsächlich ausgestoßen
+    <span class="sw baseline"></span> wenn alle mit dem Auto (Verbrenner) gekommen wären</p>
+</main>
+
+<script>
+(function () {
+  function kg(g) {
+    var v = g / 1000;
+    return v.toLocaleString('de-DE', { maximumFractionDigits: v < 10 ? 1 : 0 }) + ' kg';
+  }
+  function render(el, t, label) {
+    var max = Math.max(t.co2_g, t.baseline_g, 1);
+    el.querySelector('.date').textContent = label;
+    el.querySelector('.bars').innerHTML =
+      bar('actual', 'Tatsächlich', t.co2_g, max) + bar('baseline', 'Alle mit dem Auto', t.baseline_g, max);
+    var saved = t.baseline_g - t.co2_g;
+    el.querySelector('.meta').textContent = t.trips
+      ? t.trips + ' Anreisen · ' + Math.round(t.km).toLocaleString('de-DE') + ' km · ' + kg(saved) + ' eingespart'
+      : 'Noch keine Anreisen erfasst';
+  }
+  function bar(cls, label, value, max) {
+    var pct = value > 0 ? Math.max(2, value / max * 100) : 0;
+    return '<div class="bar-row"><span class="bar-label">' + label + '</span>' +
+      '<div class="bar-track"><div class="bar ' + cls + '" style="width:' + pct + '%"></div></div>' +
+      '<span class="bar-value">' + kg(value) + '</span></div>';
+  }
+  function load() {
+    fetch('/api/uebersicht').then(function (r) { return r.json(); }).then(function (d) {
+      var day = new Date(d.date + 'T12:00:00').toLocaleDateString('de-DE',
+        { weekday: 'long', day: 'numeric', month: 'long' });
+      render(document.getElementById('p-today'), d.today, day);
+      render(document.getElementById('p-year'), d.year_total, String(d.year));
+    }).catch(function () {});
+  }
+  load();
+  setInterval(load, 60 * 1000);
+})();
+</script>
+{% endblock %}

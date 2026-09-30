@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Anreise erfassen{% endblock %}
+{% block head %}<link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">{% endblock %}
+{% block bodyclass %}kiosk{% endblock %}
+{% block body %}
+<main>
+  <section id="step-name">
+    <h1>Guten Morgen! Wer bist du?</h1>
+    <div class="tiles">
+      {% for e in employees %}
+      <button class="tile" data-id="{{ e.id }}">{{ e.name }}</button>
+      {% else %}
+      <p class="hint">Noch keine Mitarbeitenden mit hinterlegter Strecke. Bitte in der Verwaltung pflegen.</p>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section id="step-mode" hidden>
+    <h1>Wie bist du heute gekommen, <span id="who"></span>?</h1>
+    <div class="tiles">
+      {% for m in modes %}
+      <button class="tile mode" data-id="{{ m.id }}"><span class="icon">{{ m.icon }}</span>{{ m.label | replace('/', '/\u200b') }}</button>
+      {% endfor %}
+    </div>
+    <button class="back" id="back">← Zurück</button>
+  </section>
+
+  <section id="step-done" hidden>
+    <h1 id="done-text">Danke!</h1>
+  </section>
+</main>
+
+<script>
+(function () {
+  var steps = {
+    name: document.getElementById('step-name'),
+    mode: document.getElementById('step-mode'),
+    done: document.getElementById('step-done')
+  };
+  var employeeId = null, resetTimer = null;
+
+  function show(step) {
+    Object.keys(steps).forEach(function (k) { steps[k].hidden = (k !== step); });
+    clearTimeout(resetTimer);
+    // Nach Inaktivität bzw. Bestätigung zurück zur Namensauswahl
+    if (step !== 'name') resetTimer = setTimeout(reset, step === 'done' ? 2500 : 20000);
+  }
+  function reset() { employeeId = null; show('name'); }
+
+  steps.name.querySelectorAll('.tile').forEach(function (b) {
+    b.addEventListener('click', function () {
+      employeeId = b.dataset.id;
+      document.getElementById('who').textContent = b.textContent;
+      show('mode');
+    });
+  });
+  document.getElementById('back').addEventListener('click', reset);
+
+  steps.mode.querySelectorAll('.tile').forEach(function (b) {
+    b.addEventListener('click', function () {
+      if (!employeeId) return reset();
+      var body = JSON.stringify({ employee_id: employeeId, mode_id: b.dataset.id });
+      employeeId = null;
+      fetch('/api/anreise', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body })
+        .then(function (r) { return r.ok; }, function () { return false; })
+        .then(function (ok) {
+          var t = document.getElementById('done-text');
+          t.textContent = ok ? 'Danke, ist gespeichert! 🌱' : 'Speichern fehlgeschlagen – bitte nochmal versuchen.';
+          steps.done.classList.toggle('error', !ok);
+          show('done');
+        });
+    });
+  });
+
+  // Seite gelegentlich neu laden, damit Änderungen aus der Verwaltung ankommen
+  setInterval(function () { if (!steps.name.hidden) location.reload(); }, 15 * 60 * 1000);
+})();
+</script>
+{% endblock %}

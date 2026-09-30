@@ -1,0 +1,118 @@
+:root {
+  --bg: #f6f7f4;
+  --fg: #1d2a22;
+  --muted: #5b6a60;
+  --card: #ffffff;
+  --line: #d9ded8;
+  --accent: #2f7d4f;
+  --accent-fg: #ffffff;
+  --actual: #2f7d4f;
+  --baseline: #9aa39d;
+  --danger: #b3261e;
+  --warn-bg: #fff4d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121714;
+    --fg: #e6ece8;
+    --muted: #9fb0a5;
+    --card: #1c231f;
+    --line: #2e3833;
+    --accent: #4caf72;
+    --actual: #4caf72;
+    --baseline: #6b756f;
+    --danger: #ef6b61;
+    --warn-bg: #3b3218;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.4;
+}
+main { padding: 24px 16px; max-width: 1200px; margin: 0 auto; }
+h1 { margin: 0 0 24px; }
+button { font: inherit; cursor: pointer; }
+[hidden] { display: none !important; }
+
+/* ---------- Erfassung (Tablet) ---------- */
+.kiosk { user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+.kiosk h1 { font-size: clamp(1.6rem, 4vw, 2.6rem); text-align: center; }
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 16px;
+}
+.tile {
+  min-height: 120px;
+  padding: 16px;
+  border: 2px solid var(--line);
+  border-radius: 16px;
+  background: var(--card);
+  color: var(--fg);
+  font-size: clamp(1.3rem, 2.4vw, 1.8rem);
+  font-weight: 600;
+}
+.tile:active { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.tile.mode { font-size: clamp(1.05rem, 1.8vw, 1.3rem); padding: 12px 8px; hyphens: auto; overflow-wrap: break-word; }
+.tile.mode { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+.tile .icon { font-size: 2.6rem; line-height: 1; }
+.back {
+  margin-top: 24px;
+  padding: 16px 28px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--line);
+  color: var(--fg);
+  font-size: 1.3rem;
+}
+#step-done h1 { margin-top: 20vh; font-size: clamp(2rem, 6vw, 3.5rem); color: var(--accent); }
+#step-done.error h1 { color: var(--danger); }
+.hint { color: var(--muted); }
+
+/* ---------- Übersicht (Empfang) ---------- */
+.dashboard h1 { font-size: clamp(1.8rem, 4vw, 3rem); }
+.panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; }
+.panel { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 24px; }
+.panel h2 { margin: 0 0 20px; font-size: 1.6rem; }
+.panel h2 small { font-weight: 400; color: var(--muted); font-size: 1rem; margin-left: 8px; }
+.bar-row { display: grid; grid-template-columns: 9.5em 1fr 6em; align-items: center; gap: 12px; margin-bottom: 14px; }
+.bar-label { color: var(--muted); }
+.bar-track { height: 40px; background: var(--bg); border-radius: 8px; overflow: hidden; }
+.bar { height: 100%; border-radius: 8px; transition: width .6s ease; }
+.bar.actual, .sw.actual { background: var(--actual); }
+.bar.baseline, .sw.baseline { background: var(--baseline); }
+.bar-value { font-weight: 700; font-size: 1.2rem; text-align: right; font-variant-numeric: tabular-nums; }
+.meta { margin: 8px 0 0; color: var(--muted); }
+.legend { color: var(--muted); margin-top: 20px; }
+.sw { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; margin: 0 4px 0 12px; }
+@media (max-width: 520px) {
+  .bar-row { grid-template-columns: 1fr auto; }
+  .bar-track { grid-column: 1 / -1; grid-row: 2; }
+}
+
+/* ---------- Verwaltung ---------- */
+.admin main { max-width: 1100px; }
+.admin main.narrow { max-width: 420px; }
+.admin-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
+.admin-head h1 { margin: 0; }
+.admin-head nav { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.admin-head nav form { margin: 0; }
+.admin a { color: var(--accent); }
+.admin h2 { margin-top: 32px; }
+.admin table { width: 100%; border-collapse: collapse; background: var(--card); display: block; overflow-x: auto; }
+.admin th, .admin td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+.admin input:not([type]), .admin input[type=password], .admin input[name] {
+  font: inherit; padding: 4px 6px; background: var(--bg); color: var(--fg);
+  border: 1px solid var(--line); border-radius: 6px;
+}
+.admin input[type=checkbox] { width: 20px; height: 20px; }
+.admin button { padding: 4px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
+.admin button.danger { color: var(--danger); }
+.admin tr.missing { background: var(--warn-bg); }
+.warn { color: var(--danger); font-size: .9em; margin-left: 6px; }
+.error { color: var(--danger); }
+.admin form label { display: block; margin-bottom: 12px; }

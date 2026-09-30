@@ -1,0 +1,9 @@
+{
+  "name": "Anreise erfassen",
+  "short_name": "Anreise",
+  "start_url": "/erfassung",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#f6f7f4",
+  "theme_color": "#2f7d4f"
+}
