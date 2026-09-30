@@ -40,7 +40,8 @@ g CO₂-Äquivalente pro Personenkilometer inkl. Energievorkette.
 |---|---|---|
 | zu Fuß | 0 | keine direkten Emissionen |
 | Fahrrad/E-Bike | 0 | keine direkten Emissionen, E-Bike-Strom vernachlässigt |
-| ÖPNV | 59 | **eigene Mittelung** aus UBA Linienbus Nahverkehr 90, Eisenbahn Nahverkehr 44, Straßen-/Stadt-/U-Bahn 42 |
+| Bus | 90 | UBA Linienbus Nahverkehr |
+| Bus + Bahn | 67 | **Annahme:** je halbe Strecke Bus (90) und Eisenbahn Nahverkehr (44) |
 | Auto (Verbrenner) | 164 | UBA Pkw (Ø 1,4 Personen/Pkw) |
 | E-Auto | 70 | UBA Elektro-Pkw |
 | Fahrgemeinschaft Auto | 115 | **abgeleitet:** 164 × 1,4 ÷ 2 Personen |
@@ -88,7 +89,9 @@ Verwaltung ankommen.
 ## Erste Schritte nach der Installation
 
 1. `http://<pi-ip>:8080/verwaltung` öffnen und anmelden.
-2. Bei Niko, Angela und Marlene die **Gesamtstrecke (hin + zurück)** eintragen.
+2. Strecken prüfen. Vorbelegt sind Niko 18 km, Angela 74 km, Marlene 34 km
+   (jeweils hin + zurück). Diese Startwerte werden nur beim allerersten Start mit leerer
+   Datenbank übernommen; spätere Änderungen erfolgen in der Verwaltung.
    Personen ohne Strecke erscheinen nicht auf dem Tablet.
 3. Die Faktoren prüfen, insbesondere Motorrad/Roller.
 

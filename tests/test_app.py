@@ -44,13 +44,20 @@ def mode_id(app, label):
         return get_db().execute("SELECT id FROM modes WHERE label = ?", (label,)).fetchone()[0]
 
 
-def test_seed_employees_hidden_until_distance_set(app, client):
+def test_seed_employees_with_roundtrip_distance(app, client):
+    from anreise.app import get_db
+    with app.app_context():
+        rows = get_db().execute("SELECT name, distance_km FROM employees").fetchall()
+    assert {r["name"]: r["distance_km"] for r in rows} == {"Niko": 18, "Angela": 74, "Marlene": 34}
     page = client.get("/erfassung").get_data(as_text=True)
-    assert "Niko" not in page
+    assert "Niko" in page and "Bus + Bahn" in page and "ÖPNV" not in page
+
+
+def test_employee_without_distance_hidden(app, client):
     csrf = admin_login(client)
-    set_distance(client, csrf, 1, "Niko", "12,5")
+    set_distance(client, csrf, 1, "Niko", "0")
     page = client.get("/erfassung").get_data(as_text=True)
-    assert "Niko" in page and "Angela" not in page
+    assert "Niko" not in page and "Angela" in page
 
 
 def test_arrival_aggregates_without_storing_name(app, client):
@@ -82,7 +89,7 @@ def test_arrival_aggregates_without_storing_name(app, client):
 def test_year_and_day_separation(app, client):
     csrf = admin_login(client)
     set_distance(client, csrf, 1, "Niko", "10")
-    bike = mode_id(app, "ÖPNV")
+    bike = mode_id(app, "Bus")
     client.post("/api/anreise", json={"employee_id": 1, "mode_id": bike})
     app.state["today"] = date(2026, 10, 2)
     client.post("/api/anreise", json={"employee_id": 1, "mode_id": bike})
@@ -99,16 +106,16 @@ def test_year_and_day_separation(app, client):
 def test_factor_change_does_not_rewrite_history(app, client):
     csrf = admin_login(client)
     set_distance(client, csrf, 1, "Niko", "10")
-    oepnv = mode_id(app, "ÖPNV")
-    client.post("/api/anreise", json={"employee_id": 1, "mode_id": oepnv})
-    client.post(f"/verwaltung/verkehrsmittel/{oepnv}",
-                data={"csrf": csrf, "label": "ÖPNV", "factor_g": "100", "active": "on"})
+    bus = mode_id(app, "Bus")
+    client.post("/api/anreise", json={"employee_id": 1, "mode_id": bus})
+    client.post(f"/verwaltung/verkehrsmittel/{bus}",
+                data={"csrf": csrf, "label": "Bus", "factor_g": "100", "active": "on"})
     d = client.get("/api/uebersicht").get_json()
-    assert d["today"]["co2_g"] == pytest.approx(10 * 59)
+    assert d["today"]["co2_g"] == pytest.approx(10 * 90)
 
 
 def test_invalid_arrival_rejected(app, client):
-    assert client.post("/api/anreise", json={"employee_id": 1, "mode_id": 1}).status_code == 400
+    assert client.post("/api/anreise", json={"employee_id": 999, "mode_id": 1}).status_code == 400
     assert client.post("/api/anreise", json={}).status_code == 400
 
 

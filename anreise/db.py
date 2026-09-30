@@ -47,9 +47,9 @@ DEFAULT_MODES = [
     # label, icon, factor_g, source, is_baseline
     ("zu Fuß", "🚶", 0, "Keine direkten Emissionen", 0),
     ("Fahrrad/E-Bike", "🚲", 0, "Keine direkten Emissionen (E-Bike-Strom vernachlässigt)", 0),
-    ("ÖPNV", "🚌", 59,
-     "Mittelwert UBA: Linienbus Nahverkehr 90, Eisenbahn Nahverkehr 44, "
-     "Straßen-/Stadt-/U-Bahn 42", 0),
+    ("Bus", "🚌", 90, "UBA Linienbus Nahverkehr", 0),
+    ("Bus + Bahn", "🚌🚆", 67,
+     "Annahme je halbe Strecke: UBA Linienbus Nahverkehr 90 und Eisenbahn Nahverkehr 44", 0),
     ("Auto (Verbrenner)", "🚗", 164, "UBA Pkw (Ø 1,4 Personen/Pkw)", 1),
     ("E-Auto", "🔌", 70, "UBA Elektro-Pkw", 0),
     ("Fahrgemeinschaft Auto", "🚗👥", 115,
@@ -60,7 +60,8 @@ DEFAULT_MODES = [
      "PLATZHALTER – kein UBA-Wert verifiziert, bitte prüfen", 0),
 ]
 
-DEFAULT_EMPLOYEES = ["Niko", "Angela", "Marlene"]
+# Name, Gesamtstrecke hin + zurück in km (einfache Strecke × 2)
+DEFAULT_EMPLOYEES = [("Niko", 18), ("Angela", 74), ("Marlene", 34)]
 
 
 def connect(path):
@@ -80,8 +81,8 @@ def init_db(conn):
                 (label, icon, factor, source, sort, baseline),
             )
     if conn.execute("SELECT COUNT(*) FROM employees").fetchone()[0] == 0:
-        for name in DEFAULT_EMPLOYEES:
-            conn.execute("INSERT INTO employees (name) VALUES (?)", (name,))
+        for name, km in DEFAULT_EMPLOYEES:
+            conn.execute("INSERT INTO employees (name, distance_km) VALUES (?, ?)", (name, km))
     conn.commit()
 
 
