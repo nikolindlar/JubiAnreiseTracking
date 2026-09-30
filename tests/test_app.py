@@ -138,5 +138,5 @@ def test_csv_export(app, client):
     set_distance(client, csrf, 1, "Niko", "10")
     client.post("/api/anreise", json={"employee_id": 1, "mode_id": mode_id(app, "E-Auto")})
     body = client.get("/verwaltung/export.csv").get_data(as_text=True)
-    assert "2026-10-01;E-Auto;1;10,0;0,70;2,30" in body
+    assert "2026-10-01;E-Auto;1;10,0;0,98;2,30" in body
     assert "Niko" not in body

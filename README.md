@@ -43,14 +43,14 @@ g CO₂-Äquivalente pro Personenkilometer inkl. Energievorkette.
 | Bus | 90 | UBA Linienbus Nahverkehr |
 | Bus + Bahn | 67 | **Annahme:** je halbe Strecke Bus (90) und Eisenbahn Nahverkehr (44) |
 | Auto (Verbrenner) | 230 | **abgeleitet, Alleinfahrt:** UBA Pkw 164 g/Pkm × 1,4 Personen/Pkw |
-| E-Auto | 70 | UBA Elektro-Pkw |
+| E-Auto | 98 | **abgeleitet, Alleinfahrt:** UBA Elektro-Pkw 70 g/Pkm × 1,4 Personen/Pkw |
 | Fahrgemeinschaft Auto | 115 | **abgeleitet:** 230 ÷ 2 Personen |
-| Fahrgemeinschaft E-Auto | 49 | **abgeleitet:** 70 × 1,4 ÷ 2 Personen |
+| Fahrgemeinschaft E-Auto | 49 | **abgeleitet:** 98 ÷ 2 Personen |
 | Motorrad/Roller | 140 | **abgeleitet, kein UBA-Wert:** UK DESNZ 2024 Motorrad-Durchschnitt 114 g/km (nur direkte Emissionen) + ca. 25 % Vorkette (eigene Schätzung), 1 Person. Nur Roller < 125 cm³: ca. 105 (DESNZ klein 83 g/km + 25 %) |
 
 Hinweis: Der UBA-Pkw-Wert (164 g/Pkm) unterstellt 1,4 Personen pro Auto. Da Pendler
 meist allein fahren, wird er auf eine Person umgerechnet (164 × 1,4 ≈ 230 g/Pkm).
-Dieser Wert gilt auch für den Vergleichsbalken „alle mit dem Auto“.
+Das E-Auto wird genauso umgerechnet (70 × 1,4 ≈ 98 g/Pkm). Der Verbrenner-Wert gilt auch für den Vergleichsbalken „alle mit dem Auto“.
 
 ## Installation auf dem Raspberry Pi
 
