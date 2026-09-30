@@ -15,20 +15,26 @@ apt-get install -y python3-venv sqlite3 rsync
 
 id anreise &>/dev/null || useradd --system --home "$DATA" --shell /usr/sbin/nologin anreise
 mkdir -p "$APP" "$DATA/backup"
-rsync -a --delete --exclude .git --exclude .venv --exclude '*.sqlite3' "$SRC/" "$APP/"
+rsync -a --delete --exclude .git --exclude .venv --exclude '*.sqlite3' --exclude .env --exclude secret_key "$SRC/" "$APP/"
 python3 -m venv "$APP/.venv"
 "$APP/.venv/bin/pip" install -q -r "$APP/requirements.txt"
 chown -R anreise:anreise "$DATA"
 
 if [[ ! -f $ENVFILE ]]; then
-  read -rsp "Neues Verwaltungspasswort: " PW; echo
+  read -rsp "Passwort für die Erfassung (Tablets): " KIOSK_PW; echo
+  read -rsp "Passwort für die Verwaltung: " PW; echo
   cat > "$ENVFILE" <<EOF
 ANREISE_DB=$DATA/anreise.sqlite3
 ANREISE_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
+ANREISE_KIOSK_PASSWORD=$KIOSK_PW
 ANREISE_ADMIN_PASSWORD=$PW
 ANREISE_PORT=8080
 EOF
   chmod 600 "$ENVFILE"
+elif ! grep -q '^ANREISE_KIOSK_PASSWORD=' "$ENVFILE"; then
+  # Update einer älteren Installation ohne Erfassungspasswort
+  read -rsp "Passwort für die Erfassung (Tablets): " KIOSK_PW; echo
+  echo "ANREISE_KIOSK_PASSWORD=$KIOSK_PW" >> "$ENVFILE"
 fi
 
 # Tägliche Sicherung der Datenbank (14 Tage aufbewahren)

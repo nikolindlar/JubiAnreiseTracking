@@ -3,4 +3,6 @@ __pycache__/
 .venv/
 venv/
 *.sqlite3
+secret_key
+.env
 .pytest_cache/

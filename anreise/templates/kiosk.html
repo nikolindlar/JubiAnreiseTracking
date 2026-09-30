@@ -62,8 +62,12 @@
       var body = JSON.stringify({ employee_id: employeeId, mode_id: b.dataset.id });
       employeeId = null;
       fetch('/api/anreise', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body })
-        .then(function (r) { return r.ok; }, function () { return false; })
+        .then(function (r) {
+          if (r.status === 401) { location.href = '/erfassung/login'; return null; }
+          return r.ok;
+        }, function () { return false; })
         .then(function (ok) {
+          if (ok === null) return;
           var t = document.getElementById('done-text');
           t.textContent = ok ? 'Danke, ist gespeichert! 🌱' : 'Speichern fehlgeschlagen – bitte nochmal versuchen.';
           steps.done.classList.toggle('error', !ok);

@@ -3,7 +3,8 @@ import io
 import csv
 import os
 import secrets
-from datetime import date
+import time
+from datetime import date, timedelta
 from functools import wraps
 
 from flask import (Flask, Response, abort, g, jsonify, redirect, render_template,
@@ -16,12 +17,19 @@ def create_app(config=None):
     app = Flask(__name__)
     app.config.update(
         DATABASE=os.environ.get("ANREISE_DB", "anreise.sqlite3"),
-        SECRET_KEY=os.environ.get("ANREISE_SECRET_KEY") or secrets.token_hex(32),
+        SECRET_KEY=os.environ.get("ANREISE_SECRET_KEY", ""),
         ADMIN_PASSWORD=os.environ.get("ANREISE_ADMIN_PASSWORD", ""),
+        KIOSK_PASSWORD=os.environ.get("ANREISE_KIOSK_PASSWORD", ""),
+        # Tablets bleiben lange angemeldet, die Verwaltung nur ADMIN_SESSION_HOURS
+        PERMANENT_SESSION_LIFETIME=timedelta(days=400),
+        ADMIN_SESSION_HOURS=12,
+        SESSION_COOKIE_SAMESITE="Lax",
         TODAY=date.today,  # überschreibbar für Tests
     )
     if config:
         app.config.update(config)
+    if not app.config["SECRET_KEY"]:
+        app.config["SECRET_KEY"] = load_or_create_secret(app.config["DATABASE"])
 
     with app.app_context():
         db.init_db(get_db())
@@ -29,6 +37,39 @@ def create_app(config=None):
     app.teardown_appcontext(close_db)
     register_routes(app)
     return app
+
+
+def load_or_create_secret(db_path):
+    """Dauerhafter Sitzungsschlüssel neben der Datenbank, damit Tablets nach
+    einem Neustart des Servers angemeldet bleiben."""
+    path = os.path.join(os.path.dirname(os.path.abspath(db_path)), "secret_key")
+    try:
+        with open(path) as f:
+            key = f.read().strip()
+        if key:
+            return key
+    except FileNotFoundError:
+        pass
+    key = secrets.token_hex(32)
+    with open(path, "w") as f:
+        f.write(key)
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
+    return key
+
+
+def check_password(given, expected):
+    return bool(expected) and hmac.compare_digest(given.encode(), expected.encode())
+
+
+def is_admin():
+    return session.get("admin_until", 0) > time.time()
+
+
+def is_kiosk():
+    return bool(session.get("kiosk")) or is_admin()
 
 
 def get_db():
@@ -47,11 +88,23 @@ def close_db(_exc=None):
 def admin_required(view):
     @wraps(view)
     def wrapper(*args, **kwargs):
-        if not session.get("admin"):
+        if not is_admin():
+            session.pop("admin_until", None)
             return redirect(url_for("login"))
         if request.method == "POST" and not hmac.compare_digest(
                 request.form.get("csrf", ""), session.get("csrf", "")):
             abort(400)
+        return view(*args, **kwargs)
+    return wrapper
+
+
+def kiosk_required(view):
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        if not is_kiosk():
+            if request.path.startswith("/api/"):
+                return jsonify(ok=False, login=True), 401
+            return redirect(url_for("kiosk_login"))
         return view(*args, **kwargs)
     return wrapper
 
@@ -85,7 +138,22 @@ def register_routes(app):
         )
 
     # ---------- Erfassung (Tablets) ----------
+    @app.route("/erfassung/login", methods=["GET", "POST"])
+    def kiosk_login():
+        error = None
+        if request.method == "POST":
+            pw = app.config["KIOSK_PASSWORD"]
+            if check_password(request.form.get("password", ""), pw):
+                session["kiosk"] = True
+                session.permanent = True
+                return redirect(url_for("kiosk"))
+            error = ("Kein Erfassungspasswort konfiguriert (ANREISE_KIOSK_PASSWORD)."
+                     if not pw else "Falsches Passwort.")
+        return render_template("login.html", error=error, heading="Erfassung",
+                               hint="Einmalige Anmeldung für dieses Tablet.")
+
     @app.get("/erfassung")
+    @kiosk_required
     def kiosk():
         conn = get_db()
         employees = conn.execute(
@@ -96,6 +164,7 @@ def register_routes(app):
         return render_template("kiosk.html", employees=employees, modes=modes)
 
     @app.post("/api/anreise")
+    @kiosk_required
     def api_arrival():
         data = request.get_json(silent=True) or {}
         try:
@@ -113,18 +182,19 @@ def register_routes(app):
         error = None
         if request.method == "POST":
             pw = app.config["ADMIN_PASSWORD"]
-            if pw and hmac.compare_digest(request.form.get("password", ""), pw):
-                session.clear()
-                session["admin"] = True
+            if check_password(request.form.get("password", ""), pw):
+                session["admin_until"] = time.time() + app.config["ADMIN_SESSION_HOURS"] * 3600
                 session["csrf"] = secrets.token_hex(16)
                 return redirect(url_for("admin"))
             error = ("Kein Verwaltungspasswort konfiguriert (ANREISE_ADMIN_PASSWORD)."
                      if not pw else "Falsches Passwort.")
-        return render_template("login.html", error=error)
+        return render_template("login.html", error=error, heading="Verwaltung")
 
     @app.post("/verwaltung/logout")
     def logout():
-        session.clear()
+        # Nur die Verwaltungsanmeldung beenden, eine Tablet-Anmeldung bleibt bestehen
+        session.pop("admin_until", None)
+        session.pop("csrf", None)
         return redirect(url_for("dashboard"))
 
     @app.get("/verwaltung")
