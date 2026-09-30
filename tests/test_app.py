@@ -5,6 +5,7 @@ import pytest
 from anreise import create_app
 
 PW = "geheim"
+KIOSK_PW = "tablet"
 
 
 @pytest.fixture
@@ -14,6 +15,7 @@ def app(tmp_path):
         "DATABASE": str(tmp_path / "test.sqlite3"),
         "SECRET_KEY": "test",
         "ADMIN_PASSWORD": PW,
+        "KIOSK_PASSWORD": KIOSK_PW,
         "TODAY": lambda: state["today"],
         "TESTING": True,
     })
@@ -30,6 +32,10 @@ def admin_login(client):
     client.post("/verwaltung/login", data={"password": PW})
     with client.session_transaction() as s:
         return s["csrf"]
+
+
+def kiosk_login(client):
+    return client.post("/erfassung/login", data={"password": KIOSK_PW})
 
 
 def set_distance(client, csrf, emp_id, name, km):
@@ -49,6 +55,7 @@ def test_seed_employees_with_roundtrip_distance(app, client):
     with app.app_context():
         rows = get_db().execute("SELECT name, distance_km FROM employees").fetchall()
     assert {r["name"]: r["distance_km"] for r in rows} == {"Niko": 18, "Angela": 74, "Marlene": 34}
+    kiosk_login(client)
     page = client.get("/erfassung").get_data(as_text=True)
     assert "Niko" in page and "Bus + Bahn" in page and "ÖPNV" not in page
 
@@ -115,6 +122,7 @@ def test_factor_change_does_not_rewrite_history(app, client):
 
 
 def test_invalid_arrival_rejected(app, client):
+    kiosk_login(client)
     assert client.post("/api/anreise", json={"employee_id": 999, "mode_id": 1}).status_code == 400
     assert client.post("/api/anreise", json={}).status_code == 400
 
@@ -140,3 +148,62 @@ def test_csv_export(app, client):
     body = client.get("/verwaltung/export.csv").get_data(as_text=True)
     assert "2026-10-01;E-Auto;1;10,0;0,98;2,30" in body
     assert "Niko" not in body
+
+
+def test_kiosk_requires_login(app, client):
+    r = client.get("/erfassung")
+    assert r.status_code == 302 and r.headers["Location"].endswith("/erfassung/login")
+    r = client.post("/api/anreise", json={"employee_id": 1, "mode_id": mode_id(app, "Bus")})
+    assert r.status_code == 401
+    assert client.get("/api/uebersicht").get_json()["today"]["trips"] == 0
+    # Übersicht bleibt öffentlich
+    assert client.get("/").status_code == 200
+
+
+def test_kiosk_login_is_persistent_and_limited(app, client):
+    r = client.post("/erfassung/login", data={"password": "falsch"})
+    assert "Falsches Passwort" in r.get_data(as_text=True)
+    r = kiosk_login(client)
+    assert r.status_code == 302
+    assert "Expires=" in r.headers["Set-Cookie"]  # überlebt Browser-Neustart
+    assert client.get("/erfassung").status_code == 200
+    r = client.post("/api/anreise", json={"employee_id": 1, "mode_id": mode_id(app, "Bus")})
+    assert r.status_code == 200
+    # Erfassungspasswort öffnet nicht die Verwaltung
+    assert client.get("/verwaltung").status_code == 302
+    assert client.post("/verwaltung/login", data={"password": KIOSK_PW}).status_code == 200
+    assert client.get("/verwaltung").status_code == 302
+
+
+def test_admin_logout_keeps_kiosk_login(client):
+    kiosk_login(client)
+    csrf = admin_login(client)
+    assert client.get("/verwaltung").status_code == 200
+    client.post("/verwaltung/logout", data={"csrf": csrf})
+    assert client.get("/verwaltung").status_code == 302
+    assert client.get("/erfassung").status_code == 200
+
+
+def test_admin_session_expires(app, client):
+    admin_login(client)
+    with client.session_transaction() as s:
+        s["admin_until"] = 1  # längst abgelaufen
+    assert client.get("/verwaltung").status_code == 302
+    assert client.get("/erfassung").status_code == 302
+
+
+def test_missing_passwords_block_login(tmp_path):
+    app = create_app({"DATABASE": str(tmp_path / "x.sqlite3"),
+                      "ADMIN_PASSWORD": "", "KIOSK_PASSWORD": ""})
+    c = app.test_client()
+    assert "Kein Erfassungspasswort" in c.post("/erfassung/login", data={"password": ""}).get_data(as_text=True)
+    assert "Kein Verwaltungspasswort" in c.post("/verwaltung/login", data={"password": ""}).get_data(as_text=True)
+    assert c.get("/erfassung").status_code == 302
+
+
+def test_secret_key_persisted_next_to_db(tmp_path):
+    cfg = {"DATABASE": str(tmp_path / "x.sqlite3"), "SECRET_KEY": ""}
+    k1 = create_app(cfg).config["SECRET_KEY"]
+    k2 = create_app(cfg).config["SECRET_KEY"]
+    assert k1 and k1 == k2
+    assert (tmp_path / "secret_key").read_text() == k1
