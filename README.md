@@ -93,6 +93,7 @@ Studienlage pro kg Lebensmittel uneinheitlich ist; angezeigt wird nur der Anteil
 
 Den Bildschirm auf `http://<pi>:8080/?empfang` stellen. Dann wechseln Anreise- und
 Verpflegungs-Dashboard automatisch (Standard alle 30 s, in der Verwaltung einstellbar, 0 = aus).
+In der Kopfzeile zeigt ein Countdown, wann zum nächsten Dashboard gewechselt wird.
 Ohne `?empfang` bleibt jede Seite stehen.
 
 ## Installation auf dem Raspberry Pi

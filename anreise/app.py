@@ -132,6 +132,7 @@ def register_routes(app):
     # ---------- Dashboards (Empfang) ----------
     # Reihenfolge = Reihenfolge des Seitenwechsels am Empfangsbildschirm
     dashboards = ["dashboard_travel", "dashboard_meals"]
+    dashboard_names = {"dashboard_travel": "Anreise-Dashboard", "dashboard_meals": "Verpflegungs-Dashboard"}
 
     @app.get("/")
     def index():
@@ -166,7 +167,8 @@ def register_routes(app):
             except ValueError:
                 seconds = 0
         nxt = pages[(pages.index(current) + 1) % len(pages)]
-        return {"rotate_seconds": seconds, "next_url": url_for(nxt, empfang=1)}
+        return {"rotate_seconds": seconds, "next_url": url_for(nxt, empfang=1),
+                "next_name": dashboard_names[nxt]}
 
     @app.get("/api/dashboard/anreise")
     def api_overview():
