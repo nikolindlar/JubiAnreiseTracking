@@ -7,6 +7,7 @@ den CO₂-Ausstoß pro Tag und Jahr im Empfangsbereich an.
 |---|---|---|
 | Erfassung | `http://<pi>:8080/erfassung` | Tablets an den Eingängen: Name → Verkehrsmittel (Passwort, einmalig pro Tablet) |
 | Übersicht | `http://<pi>:8080/` | Empfang: CO₂ tatsächlich vs. „alle mit dem Auto“, Ø g CO₂/km, Beteiligung, Verkehrsmittel-Anteile, Strecke mit Vergleichen, Flug-Vergleich, Rekorde |
+| Verpflegung | `http://<pi>:8080/ernaehrung` | CO₂ der vegetarischen Verpflegung vs. Mischkost (Pauschalwerte, mitlaufender Zähler), Bio-Anteil |
 | Verwaltung | `http://<pi>:8080/verwaltung` | Mitarbeitende, Strecken, Verkehrsmittel, Emissionsfaktoren, CSV-Export (Passwort) |
 
 ## Datenschutz – was gespeichert wird
@@ -69,11 +70,29 @@ Das E-Auto wird genauso umgerechnet (70 × 1,4 ≈ 98 g/Pkm). Der Verbrenner-Wer
 - **Eingespartes CO₂ als Flüge** ab München, einfache Strecke, pro Person. Näherung:
   Entfernung × 290 g/km (UBA Inlandsflug 2024) bzw. × 210 g/km (abgeleitet aus dem
   UBA-Beispiel Frankfurt–New York).
+- **Ø g CO₂/km je Monat** als Verlauf, mit dem Vorjahresdurchschnitt als gestrichelter Linie
+  (sobald Daten aus dem Vorjahr vorliegen).
 - **Rekorde:** bester Tag nach Anteil klimafreundlich und längste Serie von Tagen mit
   mindestens 50 % klimafreundlich. Gezählt werden nur Tage mit mindestens 5 Anreisen;
   Tage ohne genug Daten (Wochenende) unterbrechen die Serie nicht.
 - Welche Verkehrsmittel als „klimafreundlich“ bzw. „Muskelkraft“ zählen, ist in der Verwaltung
   einstellbar (Standard: zu Fuß, Rad, Bus, Bus + Bahn bzw. zu Fuß, Rad).
+
+## Verpflegung
+
+Pauschalwerte, einstellbar unter Verwaltung → „Verpflegung & Empfangsbildschirm“:
+Übernachtungen mit Vollpension pro Jahr (Standard 20.000), geschlossene Monate (Standard
+Dezember), Bio-Anteil (Standard 50 %) und kg CO₂e pro Verpflegungstag. Der Jahreswert wird
+gleichmäßig auf die Öffnungstage verteilt und läuft als Zähler mit. Vergleich: vegetarisch
+3,81 kg vs. Mischkost mit mittlerem Fleischkonsum 5,63 kg CO₂e pro Tag (Scarborough u. a. 2014,
+*Climatic Change*, je 2.000 kcal). Für Bio wird bewusst kein CO₂-Vorteil angerechnet, da die
+Studienlage pro kg Lebensmittel uneinheitlich ist; angezeigt wird nur der Anteil.
+
+## Empfangsbildschirm
+
+Den Bildschirm auf `http://<pi>:8080/?empfang` stellen. Dann wechseln Anreise- und
+Verpflegungsseite automatisch (Standard alle 30 s, in der Verwaltung einstellbar, 0 = aus).
+Ohne `?empfang` bleibt jede Seite stehen.
 
 ## Installation auf dem Raspberry Pi
 

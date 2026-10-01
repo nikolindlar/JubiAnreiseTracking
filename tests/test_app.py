@@ -88,7 +88,7 @@ def test_arrival_aggregates_without_storing_name(app, client):
     with app.app_context():
         conn = get_db()
         tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-        assert tables == {"employees", "modes", "daily_totals"}
+        assert tables == {"employees", "modes", "daily_totals", "settings"}
         cols = {r[1] for r in conn.execute("PRAGMA table_info(daily_totals)")}
         assert "employee_id" not in cols
 
@@ -322,3 +322,71 @@ def test_migration_adds_mode_flags(tmp_path):
         rows = {r["label"]: (r["is_green"], r["is_human"])
                 for r in get_db().execute("SELECT label, is_green, is_human FROM modes")}
     assert rows == {"Fahrrad/E-Bike": (1, 1), "Bus": (1, 0), "E-Auto": (0, 0)}
+
+
+def test_monthly_trend_and_previous_year(app, client):
+    kiosk_login(client)
+    bus, car = mode_id(app, "Bus"), mode_id(app, "Auto (Verbrenner)")
+    app.state["today"] = date(2025, 6, 10)
+    client.post("/api/anreise", json={"employee_id": 1, "mode_id": car})   # 2025: 230 g/km
+    app.state["today"] = date(2026, 2, 3)
+    client.post("/api/anreise", json={"employee_id": 1, "mode_id": car})
+    app.state["today"] = date(2026, 4, 1)
+    client.post("/api/anreise", json={"employee_id": 1, "mode_id": bus})
+    d = client.get("/api/uebersicht").get_json()
+    avg = [m["avg_g_per_km"] for m in d["monthly"]]
+    assert len(avg) == 12
+    assert avg[1] == pytest.approx(230) and avg[3] == pytest.approx(90)
+    assert avg[0] is None and avg[2] is None and avg[11] is None
+    assert d["prev_year"] == {"year": 2025, "avg_g_per_km": pytest.approx(230), "trips": 1}
+
+
+def test_previous_year_empty(app, client):
+    d = client.get("/api/uebersicht").get_json()
+    assert d["prev_year"]["avg_g_per_km"] is None
+
+
+def test_nutrition_counter(app, client):
+    d = client.get("/api/ernaehrung").get_json()  # heute: 1.10.2026
+    assert d["open_days_total"] == 334            # Jan–Nov 2026
+    assert d["open_days_to_date"] == 274          # 1.1.–1.10.
+    assert d["days_to_date"] == pytest.approx(20000 * 274 / 334)
+    assert d["veg_kg"] == pytest.approx(d["days_to_date"] * 3.81)
+    assert d["saved_kg"] == pytest.approx(d["days_to_date"] * (5.63 - 3.81))
+    assert d["year_saved_kg"] == pytest.approx(20000 * 1.82)
+    assert d["organic_share"] == 50 and d["open_today"] is True
+    assert d["compare"]["label"].startswith("München–")
+
+
+def test_nutrition_closed_month(app, client):
+    app.state["today"] = date(2026, 12, 15)
+    d = client.get("/api/ernaehrung").get_json()
+    assert d["open_today"] is False
+    assert d["days_to_date"] == pytest.approx(20000)
+
+
+def test_settings_update(app, client):
+    csrf = admin_login(client)
+    r = client.post("/verwaltung/einstellungen", data={
+        "csrf": csrf, "meals_days_per_year": "18000", "meals_organic_share": "60,5",
+        "meals_veg_kg_per_day": "3,5", "meals_mixed_kg_per_day": "5,5",
+        "closed_1": "on", "closed_12": "on", "screen_rotation_seconds": "45"})
+    assert r.status_code == 302
+    app.state["today"] = date(2026, 1, 20)
+    d = client.get("/api/ernaehrung").get_json()
+    assert d["open_today"] is False and d["days_to_date"] == 0
+    assert d["open_days_total"] == 365 - 31 - 31
+    assert d["organic_share"] == 60.5 and d["days_per_year"] == 18000
+    page = client.get("/verwaltung").get_data(as_text=True)
+    assert 'name="closed_1" checked' in page and 'name="closed_2" checked' not in page
+    # Einstellungen nur mit Anmeldung
+    other = app.test_client()
+    assert other.post("/verwaltung/einstellungen", data={"meals_days_per_year": "1"}).status_code == 302
+
+
+def test_screen_rotation_only_with_empfang(client):
+    assert "setTimeout(function () { location.href" not in client.get("/").get_data(as_text=True)
+    page = client.get("/?empfang").get_data(as_text=True)
+    assert '"/ernaehrung?empfang=1"' in page and "30000" in page
+    page = client.get("/ernaehrung?empfang=1").get_data(as_text=True)
+    assert '"/?empfang=1"' in page

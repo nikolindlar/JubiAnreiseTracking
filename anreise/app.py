@@ -132,7 +132,30 @@ def register_routes(app):
     # ---------- Übersicht (Empfang) ----------
     @app.get("/")
     def dashboard():
-        return render_template("dashboard.html")
+        return render_template("dashboard.html", **screen_context("dashboard"))
+
+    @app.get("/ernaehrung")
+    def nutrition_page():
+        return render_template("ernaehrung.html", **screen_context("nutrition_page"))
+
+    @app.get("/api/ernaehrung")
+    def api_nutrition():
+        data = db.nutrition(db.get_settings(get_db()), today())
+        data["compare"] = vergleiche.vergleich(data["saved_kg"] * 1000, vergleiche.FLUEGE)
+        return jsonify(data)
+
+    def screen_context(current):
+        """Seitenwechsel für den Empfangsbildschirm: nur aktiv, wenn die Seite
+        mit ?empfang aufgerufen wird (z. B. http://<pi>:8080/?empfang)."""
+        pages = ["dashboard", "nutrition_page"]
+        seconds = 0
+        if "empfang" in request.args:
+            try:
+                seconds = max(0, int(db.get_settings(get_db()).get("screen_rotation_seconds", "0")))
+            except ValueError:
+                seconds = 0
+        nxt = pages[(pages.index(current) + 1) % len(pages)]
+        return {"rotate_seconds": seconds, "next_url": url_for(nxt, empfang=1)}
 
     @app.get("/api/uebersicht")
     def api_overview():
@@ -232,7 +255,9 @@ def register_routes(app):
         employees = conn.execute(
             "SELECT * FROM employees ORDER BY name COLLATE NOCASE").fetchall()
         modes = conn.execute("SELECT * FROM modes ORDER BY sort").fetchall()
+        settings = db.get_settings(conn)
         return render_template("admin.html", employees=employees, modes=modes,
+                               settings=settings, closed=db.closed_months(settings),
                                csrf=session["csrf"])
 
     @app.post("/verwaltung/mitarbeitende")
@@ -281,6 +306,24 @@ def register_routes(app):
                 conn.execute("UPDATE modes SET is_baseline = (id = ?)", (mode_id,))
             conn.commit()
         return redirect(url_for("admin"))
+
+    @app.post("/verwaltung/einstellungen")
+    @admin_required
+    def settings_update():
+        conn = get_db()
+        f = request.form
+        db.set_setting(conn, "meals_days_per_year", f"{parse_float(f.get('meals_days_per_year')):g}")
+        db.set_setting(conn, "meals_organic_share",
+                       f"{min(100.0, parse_float(f.get('meals_organic_share'))):g}")
+        db.set_setting(conn, "meals_veg_kg_per_day", f"{parse_float(f.get('meals_veg_kg_per_day')):g}")
+        db.set_setting(conn, "meals_mixed_kg_per_day", f"{parse_float(f.get('meals_mixed_kg_per_day')):g}")
+        months = [str(m) for m in range(1, 13) if f.get(f"closed_{m}")]
+        if len(months) == 12:  # mindestens ein Monat muss geöffnet sein
+            months = months[:-1]
+        db.set_setting(conn, "meals_closed_months", ",".join(months))
+        db.set_setting(conn, "screen_rotation_seconds", f"{int(parse_float(f.get('screen_rotation_seconds')))}")
+        conn.commit()
+        return redirect(url_for("admin") + "#einstellungen")
 
     @app.get("/verwaltung/export.csv")
     @admin_required
