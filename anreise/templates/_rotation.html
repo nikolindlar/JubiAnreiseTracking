@@ -1,6 +1,23 @@
 {% if rotate_seconds %}
+<div class="rotate-timer" aria-live="off">
+  <span>Weiter zum {{ next_name }} in <strong id="rotate-left">{{ rotate_seconds }}</strong> s</span>
+  <div class="rotate-track"><div class="rotate-bar" id="rotate-bar"></div></div>
+</div>
 <script>
-  // Empfangsbildschirm: nach Ablauf zur nächsten Seite wechseln
-  setTimeout(function () { location.href = {{ next_url | tojson }}; }, {{ rotate_seconds * 1000 }});
+  // Empfangsbildschirm: Countdown anzeigen und nach Ablauf zur nächsten Seite wechseln
+  (function () {
+    var total = {{ rotate_seconds }}, end = Date.now() + total * 1000;
+    var meta = document.querySelector('.dash-meta');
+    if (meta) meta.appendChild(document.querySelector('.rotate-timer'));
+    var left = document.getElementById('rotate-left'), bar = document.getElementById('rotate-bar');
+    function tick() {
+      var ms = Math.max(0, end - Date.now());
+      left.textContent = Math.ceil(ms / 1000);
+      bar.style.width = (100 - ms / (total * 10)) + '%';
+      if (ms <= 0) location.href = {{ next_url | tojson }};
+    }
+    tick();
+    setInterval(tick, 250);
+  })();
 </script>
 {% endif %}

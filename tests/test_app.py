@@ -386,9 +386,10 @@ def test_settings_update(app, client):
 
 def test_screen_rotation_only_with_empfang(client):
     page = client.get("/dashboard/anreise").get_data(as_text=True)
-    assert "setTimeout(function () { location.href" not in page
+    assert "rotate-timer" not in page
     page = client.get("/dashboard/anreise?empfang").get_data(as_text=True)
-    assert '"/dashboard/verpflegung?empfang=1"' in page and "30000" in page
+    assert '"/dashboard/verpflegung?empfang=1"' in page
+    assert "Weiter zum Verpflegungs-Dashboard in" in page and "var total = 30" in page
     page = client.get("/dashboard/verpflegung?empfang=1").get_data(as_text=True)
     assert '"/dashboard/anreise?empfang=1"' in page
 
