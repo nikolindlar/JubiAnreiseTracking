@@ -129,16 +129,27 @@ def register_routes(app):
     def today():
         return app.config["TODAY"]()
 
-    # ---------- Übersicht (Empfang) ----------
+    # ---------- Dashboards (Empfang) ----------
+    # Reihenfolge = Reihenfolge des Seitenwechsels am Empfangsbildschirm
+    dashboards = ["dashboard_travel", "dashboard_meals"]
+
     @app.get("/")
-    def dashboard():
-        return render_template("dashboard.html", **screen_context("dashboard"))
+    def index():
+        return redirect(url_for("dashboard_travel", **request.args))
 
     @app.get("/ernaehrung")
-    def nutrition_page():
-        return render_template("ernaehrung.html", **screen_context("nutrition_page"))
+    def old_nutrition_url():
+        return redirect(url_for("dashboard_meals", **request.args))
 
-    @app.get("/api/ernaehrung")
+    @app.get("/dashboard/anreise")
+    def dashboard_travel():
+        return render_template("dashboard_anreise.html", **screen_context("dashboard_travel"))
+
+    @app.get("/dashboard/verpflegung")
+    def dashboard_meals():
+        return render_template("dashboard_verpflegung.html", **screen_context("dashboard_meals"))
+
+    @app.get("/api/dashboard/verpflegung")
     def api_nutrition():
         data = db.nutrition(db.get_settings(get_db()), today())
         data["compare"] = vergleiche.vergleich(data["saved_kg"] * 1000, vergleiche.FLUEGE)
@@ -147,7 +158,7 @@ def register_routes(app):
     def screen_context(current):
         """Seitenwechsel für den Empfangsbildschirm: nur aktiv, wenn die Seite
         mit ?empfang aufgerufen wird (z. B. http://<pi>:8080/?empfang)."""
-        pages = ["dashboard", "nutrition_page"]
+        pages = dashboards
         seconds = 0
         if "empfang" in request.args:
             try:
@@ -157,7 +168,7 @@ def register_routes(app):
         nxt = pages[(pages.index(current) + 1) % len(pages)]
         return {"rotate_seconds": seconds, "next_url": url_for(nxt, empfang=1)}
 
-    @app.get("/api/uebersicht")
+    @app.get("/api/dashboard/anreise")
     def api_overview():
         data = db.overview(get_db(), today())
         y = data["year_total"]
@@ -246,7 +257,7 @@ def register_routes(app):
         # Nur die Verwaltungsanmeldung beenden, eine Tablet-Anmeldung bleibt bestehen
         session.pop("admin_until", None)
         session.pop("csrf", None)
-        return redirect(url_for("dashboard"))
+        return redirect(url_for("dashboard_travel"))
 
     @app.get("/verwaltung")
     @admin_required

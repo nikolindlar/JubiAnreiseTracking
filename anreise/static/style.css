@@ -88,7 +88,7 @@ button { font: inherit; cursor: pointer; }
 .finish { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
 .hint { color: var(--muted); }
 
-/* ---------- Übersicht (Empfang) ---------- */
+/* ---------- Dashboards (Empfang) ---------- */
 .dashboard main { max-width: 1800px; padding-top: 14px; padding-bottom: 12px; }
 .dash-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; margin-bottom: 10px; }
 .dash-head h1 { margin: 0; font-size: clamp(1.8rem, 3vw, 2.8rem); }

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}CO₂ unserer Anreise{% endblock %}
+{% block title %}Anreise-Dashboard{% endblock %}
 {% block bodyclass %}dashboard{% endblock %}
 {% block body %}
 <main>
@@ -242,7 +242,7 @@
   }
 
   function load() {
-    fetch('/api/uebersicht').then(function (r) { return r.json(); }).then(render).catch(function () {});
+    fetch('/api/dashboard/anreise').then(function (r) { return r.json(); }).then(render).catch(function () {});
   }
   load();
   setInterval(load, 60 * 1000);

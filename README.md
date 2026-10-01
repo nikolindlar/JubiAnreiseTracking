@@ -6,8 +6,9 @@ den CO₂-Ausstoß pro Tag und Jahr im Empfangsbereich an.
 | Seite | Adresse | Zweck |
 |---|---|---|
 | Erfassung | `http://<pi>:8080/erfassung` | Tablets an den Eingängen: Name → Verkehrsmittel (Passwort, einmalig pro Tablet) |
-| Übersicht | `http://<pi>:8080/` | Empfang: CO₂ tatsächlich vs. „alle mit dem Auto“, Ø g CO₂/km, Beteiligung, Verkehrsmittel-Anteile, Strecke mit Vergleichen, Flug-Vergleich, Rekorde |
-| Verpflegung | `http://<pi>:8080/ernaehrung` | CO₂ der vegetarischen Verpflegung vs. Mischkost (Pauschalwerte, mitlaufender Zähler), Bio-Anteil |
+| Anreise-Dashboard | `http://<pi>:8080/dashboard/anreise` | Empfang: CO₂ tatsächlich vs. „alle mit dem Auto“, Ø g CO₂/km, Beteiligung, Verkehrsmittel-Anteile, Strecke mit Vergleichen, Flug-Vergleich, Rekorde |
+| Verpflegungs-Dashboard | `http://<pi>:8080/dashboard/verpflegung` | CO₂ der vegetarischen Verpflegung vs. Mischkost (Pauschalwerte, mitlaufender Zähler), Bio-Anteil |
+| (Startseite) | `http://<pi>:8080/` | leitet zum Anreise-Dashboard weiter |
 | Verwaltung | `http://<pi>:8080/verwaltung` | Mitarbeitende, Strecken, Verkehrsmittel, Emissionsfaktoren, CSV-Export (Passwort) |
 
 ## Datenschutz – was gespeichert wird
@@ -23,7 +24,7 @@ den CO₂-Ausstoß pro Tag und Jahr im Empfangsbereich an.
   CO₂-Werten, ohne Name. Die Marke verfällt nach 30 Sekunden (20 s plus Puffer für die
   Übertragung) und geht bei einem Neustart verloren.
 - **Einschränkung:** Bei wenigen Personen lassen sich aus den Summen Rückschlüsse ziehen,
-  zum Beispiel wenn jemand die Übersicht direkt nach einer Buchung beobachtet oder
+  zum Beispiel wenn jemand das Anreise-Dashboard direkt nach einer Buchung beobachtet oder
   nur eine Person mit dem Motorrad kommt.
 - Die Erfassung ist durch ein eigenes Passwort geschützt. Jedes Tablet meldet sich einmal an
   und bleibt dann über ein Cookie bis zu 400 Tage angemeldet, auch über Neustarts hinweg.
@@ -59,7 +60,7 @@ Hinweis: Der UBA-Pkw-Wert (164 g/Pkm) unterstellt 1,4 Personen pro Auto. Da Pend
 meist allein fahren, wird er auf eine Person umgerechnet (164 × 1,4 ≈ 230 g/Pkm).
 Das E-Auto wird genauso umgerechnet (70 × 1,4 ≈ 98 g/Pkm). Der Verbrenner-Wert gilt auch für den Vergleichsbalken „alle mit dem Auto“.
 
-## Kennzahlen der Übersicht
+## Anreise-Dashboard
 
 - **Heute / Jahr:** eingespartes CO₂, Balken tatsächlich vs. alle mit dem Auto, Ø g CO₂ pro km,
   heute die Beteiligung („erfasst X von Y“), im Jahr der Anteil klimafreundlicher Anreisen.
@@ -78,7 +79,7 @@ Das E-Auto wird genauso umgerechnet (70 × 1,4 ≈ 98 g/Pkm). Der Verbrenner-Wer
 - Welche Verkehrsmittel als „klimafreundlich“ bzw. „Muskelkraft“ zählen, ist in der Verwaltung
   einstellbar (Standard: zu Fuß, Rad, Bus, Bus + Bahn bzw. zu Fuß, Rad).
 
-## Verpflegung
+## Verpflegungs-Dashboard
 
 Pauschalwerte, einstellbar unter Verwaltung → „Verpflegung & Empfangsbildschirm“:
 Übernachtungen mit Vollpension pro Jahr (Standard 20.000), geschlossene Monate (Standard
@@ -91,7 +92,7 @@ Studienlage pro kg Lebensmittel uneinheitlich ist; angezeigt wird nur der Anteil
 ## Empfangsbildschirm
 
 Den Bildschirm auf `http://<pi>:8080/?empfang` stellen. Dann wechseln Anreise- und
-Verpflegungsseite automatisch (Standard alle 30 s, in der Verwaltung einstellbar, 0 = aus).
+Verpflegungs-Dashboard automatisch (Standard alle 30 s, in der Verwaltung einstellbar, 0 = aus).
 Ohne `?empfang` bleibt jede Seite stehen.
 
 ## Installation auf dem Raspberry Pi

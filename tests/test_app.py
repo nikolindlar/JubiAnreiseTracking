@@ -77,7 +77,7 @@ def test_arrival_aggregates_without_storing_name(app, client):
     assert client.post("/api/anreise", json={"employee_id": 1, "mode_id": bike}).status_code == 200
     assert client.post("/api/anreise", json={"employee_id": 2, "mode_id": car}).status_code == 200
 
-    d = client.get("/api/uebersicht").get_json()
+    d = client.get("/api/dashboard/anreise").get_json()
     assert d["today"]["trips"] == 2
     assert d["today"]["km"] == 30
     assert d["today"]["co2_g"] == pytest.approx(20 * 230)
@@ -101,12 +101,12 @@ def test_year_and_day_separation(app, client):
     app.state["today"] = date(2026, 10, 2)
     client.post("/api/anreise", json={"employee_id": 1, "mode_id": bike})
 
-    d = client.get("/api/uebersicht").get_json()
+    d = client.get("/api/dashboard/anreise").get_json()
     assert d["today"]["trips"] == 1
     assert d["year_total"]["trips"] == 2
 
     app.state["today"] = date(2027, 1, 1)
-    d = client.get("/api/uebersicht").get_json()
+    d = client.get("/api/dashboard/anreise").get_json()
     assert d["year_total"]["trips"] == 0
 
 
@@ -117,7 +117,7 @@ def test_factor_change_does_not_rewrite_history(app, client):
     client.post("/api/anreise", json={"employee_id": 1, "mode_id": bus})
     client.post(f"/verwaltung/verkehrsmittel/{bus}",
                 data={"csrf": csrf, "label": "Bus", "factor_g": "100", "active": "on"})
-    d = client.get("/api/uebersicht").get_json()
+    d = client.get("/api/dashboard/anreise").get_json()
     assert d["today"]["co2_g"] == pytest.approx(10 * 90)
 
 
@@ -155,9 +155,9 @@ def test_kiosk_requires_login(app, client):
     assert r.status_code == 302 and r.headers["Location"].endswith("/erfassung/login")
     r = client.post("/api/anreise", json={"employee_id": 1, "mode_id": mode_id(app, "Bus")})
     assert r.status_code == 401
-    assert client.get("/api/uebersicht").get_json()["today"]["trips"] == 0
+    assert client.get("/api/dashboard/anreise").get_json()["today"]["trips"] == 0
     # Übersicht bleibt öffentlich
-    assert client.get("/").status_code == 200
+    assert client.get("/dashboard/anreise").status_code == 200
 
 
 def test_kiosk_login_is_persistent_and_limited(app, client):
@@ -216,7 +216,7 @@ def test_undo_reverts_arrival(app, client):
     r = client.post("/api/anreise", json={"employee_id": 2, "mode_id": bus}).get_json()
     assert r["undo_seconds"] == 20 and r["undo_token"]
     assert client.post("/api/anreise/storno", json={"undo_token": r["undo_token"]}).get_json()["ok"]
-    t = client.get("/api/uebersicht").get_json()["today"]
+    t = client.get("/api/dashboard/anreise").get_json()["today"]
     assert t["trips"] == 1 and t["km"] == 18
     assert t["co2_g"] == pytest.approx(18 * 90)
     # Marke nur einmal verwendbar
@@ -238,7 +238,7 @@ def test_undo_expires(app, client):
     kiosk_login(client)
     r = client.post("/api/anreise", json={"employee_id": 1, "mode_id": mode_id(app, "Bus")}).get_json()
     assert client.post("/api/anreise/storno", json={"undo_token": r["undo_token"]}).status_code == 410
-    assert client.get("/api/uebersicht").get_json()["today"]["trips"] == 1
+    assert client.get("/api/dashboard/anreise").get_json()["today"]["trips"] == 1
 
 
 def test_undo_requires_login_and_valid_token(app, client):
@@ -248,7 +248,7 @@ def test_undo_requires_login_and_valid_token(app, client):
     assert other.post("/api/anreise/storno", json={"undo_token": r["undo_token"]}).status_code == 401
     assert client.post("/api/anreise/storno", json={"undo_token": "falsch"}).status_code == 410
     assert client.post("/api/anreise/storno", json={}).status_code == 410
-    assert client.get("/api/uebersicht").get_json()["today"]["trips"] == 1
+    assert client.get("/api/dashboard/anreise").get_json()["today"]["trips"] == 1
 
 
 def test_comparisons():
@@ -287,7 +287,7 @@ def test_overview_stats(app, client):
     app.state["today"] = start + timedelta(days=10)
     client.post("/api/anreise", json={"employee_id": 1, "mode_id": ids["Bus"]})  # nur 1 Anreise: zählt nicht
 
-    d = client.get("/api/uebersicht").get_json()
+    d = client.get("/api/dashboard/anreise").get_json()
     r = d["records"]
     assert r["best_day"] == {"day": "2026-03-11", "share": 1.0}
     assert r["longest_streak"] == 3
@@ -333,7 +333,7 @@ def test_monthly_trend_and_previous_year(app, client):
     client.post("/api/anreise", json={"employee_id": 1, "mode_id": car})
     app.state["today"] = date(2026, 4, 1)
     client.post("/api/anreise", json={"employee_id": 1, "mode_id": bus})
-    d = client.get("/api/uebersicht").get_json()
+    d = client.get("/api/dashboard/anreise").get_json()
     avg = [m["avg_g_per_km"] for m in d["monthly"]]
     assert len(avg) == 12
     assert avg[1] == pytest.approx(230) and avg[3] == pytest.approx(90)
@@ -342,12 +342,12 @@ def test_monthly_trend_and_previous_year(app, client):
 
 
 def test_previous_year_empty(app, client):
-    d = client.get("/api/uebersicht").get_json()
+    d = client.get("/api/dashboard/anreise").get_json()
     assert d["prev_year"]["avg_g_per_km"] is None
 
 
 def test_nutrition_counter(app, client):
-    d = client.get("/api/ernaehrung").get_json()  # heute: 1.10.2026
+    d = client.get("/api/dashboard/verpflegung").get_json()  # heute: 1.10.2026
     assert d["open_days_total"] == 334            # Jan–Nov 2026
     assert d["open_days_to_date"] == 274          # 1.1.–1.10.
     assert d["days_to_date"] == pytest.approx(20000 * 274 / 334)
@@ -360,7 +360,7 @@ def test_nutrition_counter(app, client):
 
 def test_nutrition_closed_month(app, client):
     app.state["today"] = date(2026, 12, 15)
-    d = client.get("/api/ernaehrung").get_json()
+    d = client.get("/api/dashboard/verpflegung").get_json()
     assert d["open_today"] is False
     assert d["days_to_date"] == pytest.approx(20000)
 
@@ -373,7 +373,7 @@ def test_settings_update(app, client):
         "closed_1": "on", "closed_12": "on", "screen_rotation_seconds": "45"})
     assert r.status_code == 302
     app.state["today"] = date(2026, 1, 20)
-    d = client.get("/api/ernaehrung").get_json()
+    d = client.get("/api/dashboard/verpflegung").get_json()
     assert d["open_today"] is False and d["days_to_date"] == 0
     assert d["open_days_total"] == 365 - 31 - 31
     assert d["organic_share"] == 60.5 and d["days_per_year"] == 18000
@@ -385,8 +385,21 @@ def test_settings_update(app, client):
 
 
 def test_screen_rotation_only_with_empfang(client):
-    assert "setTimeout(function () { location.href" not in client.get("/").get_data(as_text=True)
-    page = client.get("/?empfang").get_data(as_text=True)
-    assert '"/ernaehrung?empfang=1"' in page and "30000" in page
-    page = client.get("/ernaehrung?empfang=1").get_data(as_text=True)
-    assert '"/?empfang=1"' in page
+    page = client.get("/dashboard/anreise").get_data(as_text=True)
+    assert "setTimeout(function () { location.href" not in page
+    page = client.get("/dashboard/anreise?empfang").get_data(as_text=True)
+    assert '"/dashboard/verpflegung?empfang=1"' in page and "30000" in page
+    page = client.get("/dashboard/verpflegung?empfang=1").get_data(as_text=True)
+    assert '"/dashboard/anreise?empfang=1"' in page
+
+
+def test_dashboard_urls_and_redirects(client):
+    assert "<title>Anreise-Dashboard</title>" in client.get("/dashboard/anreise").get_data(as_text=True)
+    assert "<title>Verpflegungs-Dashboard</title>" in client.get("/dashboard/verpflegung").get_data(as_text=True)
+    # Alte Adressen und Startseite leiten weiter, ?empfang bleibt erhalten
+    r = client.get("/")
+    assert r.status_code == 302 and r.headers["Location"].endswith("/dashboard/anreise")
+    r = client.get("/?empfang")
+    assert r.headers["Location"].endswith("/dashboard/anreise?empfang=")
+    r = client.get("/ernaehrung?empfang=1")
+    assert r.headers["Location"].endswith("/dashboard/verpflegung?empfang=1")

@@ -1,4 +1,4 @@
-"""Anschauliche Vergleiche für die Übersicht.
+"""Anschauliche Vergleiche für die Dashboards.
 
 Entfernungen sind Luftlinie (Großkreis), gerundet. Die Jubi-Koordinate ist der
 Ortskern von Bad Hindelang (ca. 47,505 N / 10,375 E) und auf wenige Kilometer genau.
