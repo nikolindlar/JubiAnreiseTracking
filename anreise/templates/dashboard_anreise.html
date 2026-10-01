@@ -60,13 +60,16 @@
         <h2>Rekorde <span class="year"></span></h2>
         <div class="records"></div>
       </section>
-      <section class="panel dash-tile" id="t-trend">
-        <h2>Ø g CO₂/km je Monat <span class="year"></span></h2>
-        <div class="trend"></div>
-        <p class="tile-text prev"></p>
-      </section>
     </div>
   </div>
+
+  <section class="panel trend-panel" id="t-trend">
+    <div class="trend-head">
+      <h2>Ø g CO₂/km je Monat <span class="year"></span></h2>
+      <p class="tile-text prev"></p>
+    </div>
+    <div class="trend"></div>
+  </section>
 
   <p class="footnote">Emissionsfaktoren: Umweltbundesamt (TREMOD 2024) bzw. daraus abgeleitet.
     Flüge: einfache Strecke ab München, Näherung über Entfernung × 290 g/km (Inland) bzw. 210 g/km (Ausland).
@@ -151,24 +154,29 @@
       '<span class="record-text">in Folge mit mindestens 50 % klimafreundlich</span></div>';
   }
 
-  var MONTHS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+  var MONTHS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
   var MONTH_NAMES = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli',
     'August', 'September', 'Oktober', 'November', 'Dezember'];
 
+  var lastTrend = null;
+
   function renderTrend(monthly, prev) {
-    var W = 480, H = 105, L = 8, R = 8, T = 16, B = 20;
+    lastTrend = [monthly, prev];
+    var el = document.querySelector('#t-trend .trend');
+    // Breite in echten Pixeln, damit Schrift und Punkte bei voller Breite nicht mitskalieren
+    var W = Math.max(300, el.clientWidth), H = 140, L = 8, R = 8, T = 22, B = 24;
     var vals = monthly.map(function (m) { return m.avg_g_per_km; });
     var known = vals.filter(function (v) { return v != null; });
-    var el = document.querySelector('#t-trend .trend');
     if (!known.length) { el.innerHTML = '<p class="tile-text">Noch keine Daten</p>'; return; }
     var max = Math.max.apply(null, known.concat(prev ? [prev] : [])) * 1.15;
     var x = function (i) { return L + (W - L - R) * (i + 0.5) / 12; };
     var y = function (v) { return T + (H - T - B) * (1 - v / max); };
-    var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Durchschnittliche g CO₂ pro km je Monat">';
+    var svg = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H +
+      '" role="img" aria-label="Durchschnittliche g CO₂ pro km je Monat">';
     svg += '<line class="axis" x1="' + L + '" x2="' + (W - R) + '" y1="' + y(0) + '" y2="' + y(0) + '"/>';
     if (prev) {
       svg += '<line class="prev-line" x1="' + L + '" x2="' + (W - R) + '" y1="' + y(prev) + '" y2="' + y(prev) + '"/>' +
-        '<text class="prev-label" x="' + (W - R) + '" y="' + (y(prev) - 5) + '" text-anchor="end">Vorjahr ' + nf0.format(prev) + '</text>';
+        '<text class="prev-label" x="' + (W - R) + '" y="' + (y(prev) - 6) + '" text-anchor="end">Vorjahr ' + nf0.format(prev) + '</text>';
     }
     // Linie in Abschnitten, Lücken bei Monaten ohne Daten
     var seg = [];
@@ -178,24 +186,34 @@
     }
     vals.forEach(function (v, i) { if (v == null) flush(); else seg.push(x(i) + ',' + y(v)); });
     flush();
-    var last = -1;
-    vals.forEach(function (v, i) { if (v != null) last = i; });
+    var last = -1, best = -1;
     vals.forEach(function (v, i) {
       if (v == null) return;
-      svg += '<g class="pt"><circle class="hit" cx="' + x(i) + '" cy="' + y(v) + '" r="12"/>' +
-        '<circle class="dot" cx="' + x(i) + '" cy="' + y(v) + '" r="4"/>' +
+      last = i;
+      if (best < 0 || v < vals[best]) best = i;
+    });
+    vals.forEach(function (v, i) {
+      if (v == null) return;
+      svg += '<g class="pt"><circle class="hit" cx="' + x(i) + '" cy="' + y(v) + '" r="14"/>' +
+        '<circle class="dot" cx="' + x(i) + '" cy="' + y(v) + '" r="5"/>' +
         '<title>' + MONTH_NAMES[i] + ': Ø ' + nf0.format(v) + ' g CO₂/km</title></g>';
     });
-    // Wert über dem Punkt, außer er würde die Vorjahreslinie überdecken
-    var ly = y(vals[last]) - 9;
-    if (prev && Math.abs(ly - 4 - y(prev)) < 10) ly = y(vals[last]) + 18;
-    svg += '<text class="val-label" x="' + x(last) + '" y="' + ly + '" text-anchor="middle">' +
-      nf0.format(vals[last]) + '</text>';
+    // Beschriftet werden nur der letzte und der beste Monat; über dem Punkt,
+    // außer die Zahl würde die Vorjahreslinie überdecken
+    var narrow = W < 640;
+    (narrow ? [last] : [last, best]).filter(function (i, k, a) { return a.indexOf(i) === k; }).forEach(function (i) {
+      var ly = y(vals[i]) - 11;
+      if (prev && Math.abs(ly - 5 - y(prev)) < 12) ly = y(vals[i]) + 22;
+      svg += '<text class="val-label" x="' + x(i) + '" y="' + ly + '" text-anchor="middle">' +
+        nf0.format(vals[i]) + (i === best && i !== last ? ' (bester Monat)' : '') + '</text>';
+    });
     MONTHS.forEach(function (m, i) {
-      svg += '<text class="month" x="' + x(i) + '" y="' + (H - 6) + '" text-anchor="middle">' + m + '</text>';
+      svg += '<text class="month" x="' + x(i) + '" y="' + (H - 6) + '" text-anchor="middle">' +
+        (narrow ? m.charAt(0) : m) + '</text>';
     });
     el.innerHTML = svg + '</svg>';
   }
+  window.addEventListener('resize', function () { if (lastTrend) renderTrend(lastTrend[0], lastTrend[1]); });
 
   function render(d) {
     var day = new Date(d.date + 'T12:00:00').toLocaleDateString('de-DE',
