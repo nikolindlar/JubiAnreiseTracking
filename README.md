@@ -94,8 +94,9 @@ angemeldet, solange die Browserdaten (Cookies) nicht gelöscht werden.
 
 Ablauf am Tablet: Name antippen → Verkehrsmittel antippen (mit „← Zurück“ geht es zur
 Namensauswahl, falls die falsche Person gewählt wurde) → Bestätigung mit Knopf
-„Rückgängig? 20 s“. Der Countdown läuft ab, bei 0 s erscheint wieder die Namensauswahl.
-Ein Tipp auf den Knopf storniert die Buchung. Auf der Verkehrsmittel-Seite geht es nach
+„Rückgängig? 20 s“ und „Fertig“. Der Countdown läuft ab, bei 0 s erscheint wieder die
+Namensauswahl. „Rückgängig“ storniert die Buchung, „Fertig“ springt sofort zur
+Namensauswahl (für die nächste Person). Auf der Verkehrsmittel-Seite geht es nach
 20 s ohne Eingabe ebenfalls zurück zur Namensauswahl. Die Seite und lädt sich alle 15 Minuten neu, damit Änderungen aus der
 Verwaltung ankommen.
 

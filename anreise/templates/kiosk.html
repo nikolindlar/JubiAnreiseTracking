@@ -27,7 +27,10 @@
 
   <section id="step-done" hidden>
     <h1 id="done-text">Danke!</h1>
-    <button class="undo" id="undo" hidden>Rückgängig? <span id="undo-count">20</span> s</button>
+    <div class="done-actions">
+      <button class="undo" id="undo" hidden>Rückgängig? <span id="undo-count">20</span> s</button>
+      <button class="finish" id="finish">Fertig</button>
+    </div>
   </section>
 </main>
 
@@ -101,6 +104,12 @@
         }, 1000);
       });
     });
+  });
+
+  // Sofort zurück zur Namensauswahl, z. B. wenn die nächste Person wartet.
+  // Während ein Storno übertragen wird, nicht abbrechen.
+  document.getElementById('finish').addEventListener('click', function () {
+    if (!busy) reset();
   });
 
   undoBtn.addEventListener('click', function () {
