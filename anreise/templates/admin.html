@@ -7,6 +7,7 @@
     <h1>Verwaltung</h1>
     <nav>
       <a href="{{ url_for('dashboard') }}">Übersicht</a>
+      <a href="{{ url_for('nutrition_page') }}">Verpflegung</a>
       <a href="{{ url_for('kiosk') }}">Erfassung</a>
       <a href="{{ url_for('export_csv') }}">CSV-Export</a>
       <form method="post" action="{{ url_for('logout') }}"><button>Abmelden</button></form>
@@ -57,7 +58,7 @@
         <input form="{{ f }}" name="icon" value="{{ m.icon }}" size="3"></td>
       <td><input form="{{ f }}" name="label" value="{{ m.label }}" required></td>
       <td><input form="{{ f }}" name="factor_g" value="{{ '%g' % m.factor_g }}" inputmode="decimal" size="5"></td>
-      <td><input form="{{ f }}" name="source" value="{{ m.source }}" size="28"></td>
+      <td><input form="{{ f }}" name="source" value="{{ m.source }}" size="20"></td>
       <td><input form="{{ f }}" type="checkbox" name="active" {{ 'checked' if m.active }}></td>
       <td><input form="{{ f }}" type="checkbox" name="is_baseline" {{ 'checked' if m.is_baseline }}></td>
       <td><input form="{{ f }}" type="checkbox" name="is_green" {{ 'checked' if m.is_green }}></td>
@@ -66,5 +67,33 @@
     </tr>
     {% endfor %}
   </table>
+
+  <h2 id="einstellungen">Verpflegung &amp; Empfangsbildschirm</h2>
+  <p class="hint">Pauschalwerte für die Seite „Verpflegung“. Die Übernachtungen werden gleichmäßig auf die
+    Öffnungstage verteilt und laufen als Zähler mit.</p>
+  <form method="post" action="{{ url_for('settings_update') }}" class="settings">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Übernachtungen mit Vollpension pro Jahr
+      <input name="meals_days_per_year" value="{{ settings.meals_days_per_year }}" inputmode="decimal" size="8"></label>
+    <fieldset>
+      <legend>Geschlossene Monate</legend>
+      {% for name in ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'] %}
+      <label class="inline"><input type="checkbox" name="closed_{{ loop.index }}" {{ 'checked' if loop.index in closed }}> {{ name }}</label>
+      {% endfor %}
+    </fieldset>
+    <label>Bio-Anteil in %
+      <input name="meals_organic_share" value="{{ settings.meals_organic_share }}" inputmode="decimal" size="5"></label>
+    <label>kg CO₂e pro Verpflegungstag vegetarisch
+      <input name="meals_veg_kg_per_day" value="{{ settings.meals_veg_kg_per_day }}" inputmode="decimal" size="5"></label>
+    <label>kg CO₂e pro Verpflegungstag Mischkost (Vergleich)
+      <input name="meals_mixed_kg_per_day" value="{{ settings.meals_mixed_kg_per_day }}" inputmode="decimal" size="5"></label>
+    <p class="hint">Voreinstellung 3,81 bzw. 5,63 kg: Scarborough u. a. 2014 (Climatic Change), vegetarisch bzw.
+      mittlerer Fleischkonsum, je 2.000 kcal.</p>
+    <label>Seitenwechsel am Empfang alle … Sekunden (0 = aus)
+      <input name="screen_rotation_seconds" value="{{ settings.screen_rotation_seconds }}" inputmode="numeric" size="4"></label>
+    <p class="hint">Der Wechsel ist nur aktiv, wenn der Bildschirm die Adresse mit <code>?empfang</code> aufruft,
+      z. B. <code>http://&lt;pi&gt;:8080/?empfang</code>.</p>
+    <button>Speichern</button>
+  </form>
 </main>
 {% endblock %}

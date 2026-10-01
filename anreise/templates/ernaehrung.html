@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}CO₂ unserer Verpflegung{% endblock %}
+{% block bodyclass %}dashboard{% endblock %}
+{% block body %}
+<main>
+  <header class="dash-head">
+    <h1>CO₂ unserer Verpflegung</h1>
+    <p class="dash-date" id="dash-date"></p>
+  </header>
+
+  <div class="nutri-grid">
+    <section class="panel" id="n-main">
+      <h2><span class="year"></span> bis heute · 100 % vegetarisch</h2>
+      <p class="hero"><span class="hero-value" id="n-days"></span> <span class="hero-label">Verpflegungstage</span></p>
+      <p class="facts" id="n-meals"></p>
+      <div class="bars" id="n-bars"></div>
+      <p class="saved" id="n-saved"></p>
+      <p class="legend small"><span class="sw actual"></span> unsere vegetarische Verpflegung
+        <span class="sw baseline"></span> gleiche Menge Mischkost mit Fleisch</p>
+    </section>
+    <div class="tile-col">
+      <section class="panel dash-tile" id="n-flights">
+        <h2>Weniger CO₂ entspricht</h2>
+        <p class="tile-value"></p>
+        <p class="tile-text"></p>
+      </section>
+      <section class="panel dash-tile" id="n-organic">
+        <h2>Bio-Anteil</h2>
+        <p class="tile-value"></p>
+        <p class="tile-text">Bio heißt: keine chemisch-synthetischen Pflanzenschutzmittel, mehr Artenvielfalt,
+          Schutz von Boden und Wasser.</p>
+      </section>
+      <section class="panel dash-tile" id="n-year">
+        <h2>Planwert ganzes Jahr <span class="year"></span></h2>
+        <p class="tile-value"></p>
+        <p class="tile-text"></p>
+      </section>
+    </div>
+  </div>
+
+  <p class="footnote">Pauschalwerte: Übernachtungen mit Vollpension pro Jahr, gleichmäßig auf die Öffnungstage verteilt.
+    Emissionen pro Verpflegungstag (2.000 kcal): vegetarisch <span id="f-veg"></span> kg, Mischkost mit mittlerem
+    Fleischkonsum <span id="f-mixed"></span> kg CO₂e (Scarborough u. a. 2014, Climatic Change).
+    Flüge: einfache Strecke ab München, Näherung über Entfernung × 290 g/km (Inland) bzw. 210 g/km (Ausland).</p>
+</main>
+
+<script>
+(function () {
+  var nf1 = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 1 });
+  var nf0 = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 });
+  var nf2 = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 2 });
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+  function mass(kg) {
+    if (Math.abs(kg) >= 1000) return nf1.format(kg / 1000) + ' t';
+    return (Math.abs(kg) < 10 ? nf1 : nf0).format(kg) + ' kg';
+  }
+  function factor(f) { return (f < 10 ? nf1 : nf0).format(f); }
+  function bar(cls, label, value, max) {
+    var w = value > 0 ? Math.max(1.5, value / max * 100) : 0;
+    return '<div class="bar-row"><span class="bar-label">' + label + '</span>' +
+      '<div class="bar-track"><div class="bar ' + cls + '" style="width:' + w + '%"></div></div>' +
+      '<span class="bar-value">' + mass(value) + '</span></div>';
+  }
+
+  function render(d) {
+    document.getElementById('dash-date').textContent = new Date().toLocaleDateString('de-DE',
+      { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    document.querySelectorAll('.year').forEach(function (el) { el.textContent = d.year; });
+
+    document.getElementById('n-days').textContent = nf0.format(d.days_to_date);
+    document.getElementById('n-meals').innerHTML = '≈ <strong>' + nf0.format(d.days_to_date * 3) +
+      ' Mahlzeiten</strong> · ' + (d.open_today
+        ? 'heute rund <strong>' + nf0.format(d.days_per_open_day) + ' Gäste</strong> verpflegt'
+        : 'heute geschlossen');
+    var max = Math.max(d.veg_kg, d.mixed_kg, 1);
+    document.getElementById('n-bars').innerHTML =
+      bar('actual', 'Vegetarisch', d.veg_kg, max) + bar('baseline', 'Mit Fleisch', d.mixed_kg, max);
+    document.getElementById('n-saved').innerHTML = d.saved_kg > 0
+      ? 'rund <strong>' + mass(d.saved_kg) + ' CO₂ weniger</strong> als mit Fleisch'
+      : '';
+
+    var fl = document.getElementById('n-flights'), c = d.compare;
+    if (c) {
+      var n = factor(c.factor);
+      fl.querySelector('.tile-value').textContent = c.factor >= 1 ? n + (n === '1' ? ' Flug' : ' Flüge') : nf0.format(c.factor * 100) + ' %';
+      fl.querySelector('.tile-text').innerHTML = (c.factor >= 1 ? '' : 'eines Flugs ') + '<strong>' + esc(c.label) +
+        '</strong> (einfache Strecke, pro Person)';
+    } else {
+      fl.querySelector('.tile-value').textContent = '–';
+      fl.querySelector('.tile-text').textContent = 'Noch keine Verpflegungstage';
+    }
+
+    var org = document.getElementById('n-organic');
+    org.hidden = !(d.organic_share > 0);
+    org.querySelector('.tile-value').textContent = nf0.format(d.organic_share) + ' %';
+
+    var yr = document.getElementById('n-year');
+    yr.querySelector('.tile-value').textContent = nf0.format(d.days_per_year);
+    yr.querySelector('.tile-text').innerHTML = 'Verpflegungstage · rund <strong>' + mass(d.year_saved_kg) +
+      ' CO₂ weniger</strong> als mit Fleisch';
+
+    document.getElementById('f-veg').textContent = nf2.format(d.veg_kg_per_day);
+    document.getElementById('f-mixed').textContent = nf2.format(d.mixed_kg_per_day);
+  }
+
+  function load() {
+    fetch('/api/ernaehrung').then(function (r) { return r.json(); }).then(render).catch(function () {});
+  }
+  load();
+  setInterval(load, 10 * 60 * 1000);
+})();
+</script>
+{% include "_rotation.html" %}
+{% endblock %}

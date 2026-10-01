@@ -1,0 +1,6 @@
+{% if rotate_seconds %}
+<script>
+  // Empfangsbildschirm: nach Ablauf zur nächsten Seite wechseln
+  setTimeout(function () { location.href = {{ next_url | tojson }}; }, {{ rotate_seconds * 1000 }});
+</script>
+{% endif %}

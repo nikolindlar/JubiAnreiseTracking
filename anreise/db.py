@@ -34,6 +34,12 @@ CREATE TABLE IF NOT EXISTS modes (
 -- Aggregierte Tageswerte. CO2 wird beim Buchen mit dem dann gültigen Faktor
 -- berechnet und festgeschrieben, damit spätere Faktoränderungen die
 -- Vergangenheit nicht verändern.
+-- Einstellungen als Schlüssel/Wert (z. B. Pauschalwerte Verpflegung)
+CREATE TABLE IF NOT EXISTS settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS daily_totals (
     day        TEXT    NOT NULL,             -- YYYY-MM-DD
     mode_id    INTEGER NOT NULL REFERENCES modes(id),
@@ -76,6 +82,20 @@ DEFAULT_FLAGS = {
     "Bus + Bahn": (1, 0),
 }
 
+# Voreinstellungen (Verwaltung → Einstellungen)
+DEFAULT_SETTINGS = {
+    # Verpflegung: Übernachtungen mit Vollpension pro Jahr, gleichmäßig auf die
+    # Öffnungstage verteilt
+    "meals_days_per_year": "20000",
+    "meals_closed_months": "12",          # kommagetrennt, 1 = Januar
+    "meals_organic_share": "50",          # Bio-Anteil in %
+    # kg CO2e pro Verpflegungstag (2.000 kcal), Scarborough u. a. 2014
+    "meals_veg_kg_per_day": "3.81",       # vegetarisch
+    "meals_mixed_kg_per_day": "5.63",     # mittlerer Fleischkonsum (50–99 g/Tag)
+    # Empfangsbildschirm: Seitenwechsel in Sekunden, 0 = aus
+    "screen_rotation_seconds": "30",
+}
+
 # Name, Gesamtstrecke hin + zurück in km (einfache Strecke × 2)
 DEFAULT_EMPLOYEES = [("Niko", 18), ("Angela", 74), ("Marlene", 34)]
 
@@ -104,6 +124,8 @@ def init_db(conn):
                 (label, icon, factor, source, sort, baseline),
             )
         apply_default_flags(conn)
+    for key, value in DEFAULT_SETTINGS.items():
+        conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (key, value))
     if conn.execute("SELECT COUNT(*) FROM employees").fetchone()[0] == 0:
         for name, km in DEFAULT_EMPLOYEES:
             conn.execute("INSERT INTO employees (name, distance_km) VALUES (?, ?)", (name, km))
@@ -264,3 +286,61 @@ def monthly(conn, year, day_to):
     return [{"month": m,
              "avg_g_per_km": rows[m]["co2_g"] / rows[m]["km"] if m in rows and rows[m]["km"] else None}
             for m in range(1, 13)]
+
+
+def get_settings(conn):
+    return {r["key"]: r["value"] for r in conn.execute("SELECT key, value FROM settings")}
+
+
+def set_setting(conn, key, value):
+    conn.execute("INSERT INTO settings (key, value) VALUES (?, ?)"
+                 " ON CONFLICT(key) DO UPDATE SET value = excluded.value", (key, str(value)))
+
+
+def closed_months(settings):
+    months = set()
+    for part in settings.get("meals_closed_months", "").replace(";", ",").split(","):
+        try:
+            m = int(part)
+        except ValueError:
+            continue
+        if 1 <= m <= 12:
+            months.add(m)
+    return months
+
+
+def nutrition(settings, today):
+    """Mitlaufender Zähler: Jahreswert gleichmäßig auf die Öffnungstage verteilt."""
+    from datetime import date, timedelta
+    closed = closed_months(settings)
+    per_year = float(settings["meals_days_per_year"])
+    veg = float(settings["meals_veg_kg_per_day"])
+    mixed = float(settings["meals_mixed_kg_per_day"])
+
+    day = date(today.year, 1, 1)
+    open_total = open_to_date = 0
+    while day.year == today.year:
+        if day.month not in closed:
+            open_total += 1
+            if day <= today:
+                open_to_date += 1
+        day += timedelta(days=1)
+
+    per_day = per_year / open_total if open_total else 0
+    days_to_date = per_day * open_to_date
+    return {
+        "year": today.year,
+        "open_today": today.month not in closed,
+        "open_days_total": open_total,
+        "open_days_to_date": open_to_date,
+        "days_per_year": per_year,
+        "days_per_open_day": per_day,
+        "days_to_date": days_to_date,
+        "veg_kg": days_to_date * veg,
+        "mixed_kg": days_to_date * mixed,
+        "saved_kg": days_to_date * (mixed - veg),
+        "year_saved_kg": per_year * (mixed - veg),
+        "veg_kg_per_day": veg,
+        "mixed_kg_per_day": mixed,
+        "organic_share": float(settings["meals_organic_share"]),
+    }
