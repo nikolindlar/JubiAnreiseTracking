@@ -3,52 +3,189 @@
 {% block bodyclass %}dashboard{% endblock %}
 {% block body %}
 <main>
-  <h1>CO₂ unserer Anreise</h1>
+  <header class="dash-head">
+    <h1>CO₂ unserer Anreise</h1>
+    <p class="dash-date" id="dash-date"></p>
+  </header>
+
   <div class="panels">
     <section class="panel" id="p-today">
-      <h2>Heute <small class="date"></small></h2>
+      <h2>Heute</h2>
+      <p class="hero"><span class="hero-value"></span> <span class="hero-label">CO₂ eingespart</span></p>
       <div class="bars"></div>
-      <p class="meta"></p>
+      <ul class="facts">
+        <li class="avg"></li>
+        <li class="extra"></li>
+      </ul>
     </section>
     <section class="panel" id="p-year">
-      <h2>Jahr <small class="date"></small></h2>
+      <h2>Jahr <span class="year"></span></h2>
+      <p class="hero"><span class="hero-value"></span> <span class="hero-label">CO₂ eingespart</span></p>
       <div class="bars"></div>
-      <p class="meta"></p>
+      <ul class="facts">
+        <li class="avg"></li>
+        <li class="extra"></li>
+      </ul>
     </section>
   </div>
   <p class="legend"><span class="sw actual"></span> tatsächlich ausgestoßen
-    <span class="sw baseline"></span> wenn alle mit dem Auto (Verbrenner) gekommen wären</p>
+    <span class="sw baseline"></span> wenn alle allein mit dem Auto (Verbrenner) gekommen wären</p>
+
+  <div class="tiles-grid">
+    <section class="panel" id="t-modes">
+      <h2>Verkehrsmittel <span class="year"></span></h2>
+      <div class="mode-list"></div>
+      <p class="legend small"><span class="sw actual"></span> klimafreundlich
+        <span class="sw baseline"></span> übrige · Anteil an allen Anreisen</p>
+    </section>
+    <div class="tile-col">
+      <section class="panel dash-tile" id="t-distance">
+        <h2>Gefahrene Strecke</h2>
+        <p class="tile-value"></p>
+        <p class="tile-text"></p>
+      </section>
+      <section class="panel dash-tile" id="t-human">
+        <h2>Mit Muskelkraft <small>zu Fuß &amp; Rad</small></h2>
+        <p class="tile-value"></p>
+        <p class="tile-text"></p>
+      </section>
+    </div>
+    <div class="tile-col">
+      <section class="panel dash-tile" id="t-flights">
+        <h2>Eingespartes CO₂ <span class="year"></span> entspricht</h2>
+        <p class="tile-value"></p>
+        <p class="tile-text"></p>
+      </section>
+      <section class="panel dash-tile" id="t-records">
+        <h2>Rekorde <span class="year"></span></h2>
+        <div class="records"></div>
+      </section>
+    </div>
+  </div>
+
+  <p class="footnote">Emissionsfaktoren: Umweltbundesamt (TREMOD 2024) bzw. daraus abgeleitet.
+    Flüge: einfache Strecke ab München, Näherung über Entfernung × 290 g/km (Inland) bzw. 210 g/km (Ausland).
+    Entfernungen: Luftlinie. Rekorde zählen nur Tage mit mindestens <span class="min-trips">5</span> Anreisen.</p>
 </main>
 
 <script>
 (function () {
-  function kg(g) {
-    var v = g / 1000;
-    return v.toLocaleString('de-DE', { maximumFractionDigits: v < 10 ? 1 : 0 }) + ' kg';
+  var nf1 = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 1 });
+  var nf0 = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 });
+
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
   }
-  function render(el, t, label) {
+  function mass(g) {
+    var kg = g / 1000;
+    if (Math.abs(kg) >= 1000) return nf1.format(kg / 1000) + ' t';
+    return (Math.abs(kg) < 10 ? nf1 : nf0).format(kg) + ' kg';
+  }
+  function km(v) { return nf0.format(v) + ' km'; }
+  function pct(v) { return nf0.format(v * 100) + ' %'; }
+  function factor(f) { return (f < 10 ? nf1 : nf0).format(f); }
+
+  function setAll(sel, text) {
+    document.querySelectorAll(sel).forEach(function (el) { el.textContent = text; });
+  }
+
+  function bar(cls, label, value, max) {
+    var w = value > 0 ? Math.max(1.5, value / max * 100) : 0;
+    return '<div class="bar-row"><span class="bar-label">' + label + '</span>' +
+      '<div class="bar-track"><div class="bar ' + cls + '" style="width:' + w + '%"></div></div>' +
+      '<span class="bar-value">' + mass(value) + '</span></div>';
+  }
+
+  function renderPanel(el, t, extra, baseFactor) {
     var max = Math.max(t.co2_g, t.baseline_g, 1);
-    el.querySelector('.date').textContent = label;
+    el.querySelector('.hero-value').textContent = t.trips ? mass(Math.max(t.saved_g, 0)) : '–';
     el.querySelector('.bars').innerHTML =
       bar('actual', 'Tatsächlich', t.co2_g, max) + bar('baseline', 'Alle mit dem Auto', t.baseline_g, max);
-    var saved = t.baseline_g - t.co2_g;
-    el.querySelector('.meta').textContent = t.trips
-      ? t.trips + ' Anreisen · ' + Math.round(t.km).toLocaleString('de-DE') + ' km · ' + kg(saved) + ' eingespart'
-      : 'Noch keine Anreisen erfasst';
+    el.querySelector('.avg').innerHTML = t.avg_g_per_km == null
+      ? 'Noch keine Anreisen erfasst'
+      : '<strong>Ø ' + nf0.format(t.avg_g_per_km) + ' g CO₂/km</strong> · mit dem Auto: ' + nf0.format(baseFactor) + ' g/km';
+    el.querySelector('.extra').innerHTML = extra;
   }
-  function bar(cls, label, value, max) {
-    var pct = value > 0 ? Math.max(2, value / max * 100) : 0;
-    return '<div class="bar-row"><span class="bar-label">' + label + '</span>' +
-      '<div class="bar-track"><div class="bar ' + cls + '" style="width:' + pct + '%"></div></div>' +
-      '<span class="bar-value">' + kg(value) + '</span></div>';
+
+  function compareText(c) {
+    if (!c) return '';
+    if (c.factor >= 1) return 'so weit wie <strong>' + factor(c.factor) + '× ' + esc(c.label) + '</strong>';
+    return 'so weit wie <strong>' + pct(c.factor) + ' der Strecke ' + esc(c.label) + '</strong>';
   }
+
+  function renderModes(modes) {
+    var total = modes.reduce(function (s, m) { return s + m.trips; }, 0);
+    var max = Math.max.apply(null, modes.map(function (m) { return m.trips; }).concat([1]));
+    document.querySelector('#t-modes .mode-list').innerHTML = modes.map(function (m) {
+      var share = total ? m.trips / total : 0;
+      var w = m.trips > 0 ? Math.max(1.5, m.trips / max * 100) : 0;
+      var tip = m.label + ': ' + m.trips + ' Anreisen, ' + km(m.km);
+      return '<div class="mode-row" title="' + esc(tip) + '">' +
+        '<span class="mode-icon">' + esc(m.icon) + '</span><span class="mode-label">' + esc(m.label) + '</span>' +
+        '<div class="bar-track thin"><div class="bar ' + (m.is_green ? 'actual' : 'baseline') + '" style="width:' + w + '%"></div></div>' +
+        '<span class="mode-value">' + (total ? pct(share) : '–') + '</span></div>';
+    }).join('');
+  }
+
+  function renderRecords(r) {
+    var el = document.querySelector('#t-records .records');
+    setAll('.min-trips', r.min_trips);
+    if (!r.best_day) {
+      el.innerHTML = '<p class="tile-text">Noch keine Rekorde – gezählt werden Tage mit mindestens ' +
+        r.min_trips + ' Anreisen.</p>';
+      return;
+    }
+    var d = new Date(r.best_day.day + 'T12:00:00').toLocaleDateString('de-DE',
+      { weekday: 'short', day: 'numeric', month: 'long' });
+    el.innerHTML =
+      '<div class="record"><span class="record-value">' + pct(r.best_day.share) + '</span>' +
+      '<span class="record-text">klimafreundlich am besten Tag (' + esc(d) + ')</span></div>' +
+      '<div class="record"><span class="record-value">' + r.longest_streak + (r.longest_streak === 1 ? ' Tag' : ' Tage') + '</span>' +
+      '<span class="record-text">in Folge mit mindestens 50 % klimafreundlich</span></div>';
+  }
+
+  function render(d) {
+    var day = new Date(d.date + 'T12:00:00').toLocaleDateString('de-DE',
+      { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    document.getElementById('dash-date').textContent = day;
+    setAll('.year', d.year);
+
+    renderPanel(document.getElementById('p-today'), d.today,
+      'Erfasst: <strong>' + d.today.trips + ' von ' + d.staff + '</strong> Mitarbeitenden', d.baseline_factor_g);
+    var y = d.year_total;
+    renderPanel(document.getElementById('p-year'), y,
+      y.green_share == null ? '' : 'Klimafreundlich: <strong>' + pct(y.green_share) + '</strong> aller Anreisen',
+      d.baseline_factor_g);
+
+    renderModes(d.by_mode);
+
+    var dist = document.getElementById('t-distance');
+    dist.querySelector('.tile-value').textContent = km(y.km);
+    dist.querySelector('.tile-text').innerHTML = compareText(d.compare.distance);
+
+    var human = document.getElementById('t-human');
+    human.querySelector('.tile-value').textContent = km(d.human_km);
+    human.querySelector('.tile-text').innerHTML = compareText(d.compare.human);
+
+    var fl = document.getElementById('t-flights');
+    var fc = d.compare.flights;
+    if (fc) {
+      var n = factor(fc.factor);
+      fl.querySelector('.tile-value').textContent = fc.factor >= 1 ? n + (n === '1' ? ' Flug' : ' Flüge') : pct(fc.factor);
+      fl.querySelector('.tile-text').innerHTML = (fc.factor >= 1 ? '' : 'eines Flugs ') + '<strong>' +
+        esc(fc.label) + '</strong> (einfache Strecke, pro Person)';
+    } else {
+      fl.querySelector('.tile-value').textContent = '–';
+      fl.querySelector('.tile-text').textContent = 'Noch nichts eingespart';
+    }
+
+    renderRecords(d.records);
+  }
+
   function load() {
-    fetch('/api/uebersicht').then(function (r) { return r.json(); }).then(function (d) {
-      var day = new Date(d.date + 'T12:00:00').toLocaleDateString('de-DE',
-        { weekday: 'long', day: 'numeric', month: 'long' });
-      render(document.getElementById('p-today'), d.today, day);
-      render(document.getElementById('p-year'), d.year_total, String(d.year));
-    }).catch(function () {});
+    fetch('/api/uebersicht').then(function (r) { return r.json(); }).then(render).catch(function () {});
   }
   load();
   setInterval(load, 60 * 1000);

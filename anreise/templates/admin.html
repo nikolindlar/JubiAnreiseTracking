@@ -45,9 +45,10 @@
 
   <h2>Verkehrsmittel &amp; Emissionsfaktoren</h2>
   <p class="hint">Faktor in g CO₂-Äquivalente pro Personenkilometer. Änderungen gelten nur für neue Anreisen – bereits erfasste Werte bleiben unverändert.
-    „Vergleich“ markiert das Verkehrsmittel für den Balken „alle mit dem Auto“.</p>
+    „Vergleich“ markiert das Verkehrsmittel für den Balken „alle mit dem Auto“.
+    „Klimafreundlich“ zählt für den Anteil und die Rekorde, „Muskelkraft“ für die Strecke zu Fuß/Rad auf der Übersicht.</p>
   <table>
-    <tr><th>Symbol</th><th>Bezeichnung</th><th>g/Pkm</th><th>Quelle / Notiz</th><th>Aktiv</th><th>Vergleich</th><th></th></tr>
+    <tr><th>Symbol</th><th>Bezeichnung</th><th>g/Pkm</th><th>Quelle / Notiz</th><th>Aktiv</th><th>Vergleich</th><th>Klima&shy;freundlich</th><th>Muskel&shy;kraft</th><th></th></tr>
     {% for m in modes %}
     {% set f = 'mode-%d' % m.id %}
     <tr>
@@ -59,6 +60,8 @@
       <td><input form="{{ f }}" name="source" value="{{ m.source }}" size="28"></td>
       <td><input form="{{ f }}" type="checkbox" name="active" {{ 'checked' if m.active }}></td>
       <td><input form="{{ f }}" type="checkbox" name="is_baseline" {{ 'checked' if m.is_baseline }}></td>
+      <td><input form="{{ f }}" type="checkbox" name="is_green" {{ 'checked' if m.is_green }}></td>
+      <td><input form="{{ f }}" type="checkbox" name="is_human" {{ 'checked' if m.is_human }}></td>
       <td><button form="{{ f }}">Speichern</button></td>
     </tr>
     {% endfor %}
