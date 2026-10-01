@@ -207,3 +207,45 @@ def test_secret_key_persisted_next_to_db(tmp_path):
     k2 = create_app(cfg).config["SECRET_KEY"]
     assert k1 and k1 == k2
     assert (tmp_path / "secret_key").read_text() == k1
+
+
+def test_undo_reverts_arrival(app, client):
+    kiosk_login(client)
+    bus = mode_id(app, "Bus")
+    client.post("/api/anreise", json={"employee_id": 1, "mode_id": bus})
+    r = client.post("/api/anreise", json={"employee_id": 2, "mode_id": bus}).get_json()
+    assert r["undo_seconds"] == 20 and r["undo_token"]
+    assert client.post("/api/anreise/storno", json={"undo_token": r["undo_token"]}).get_json()["ok"]
+    t = client.get("/api/uebersicht").get_json()["today"]
+    assert t["trips"] == 1 and t["km"] == 18
+    assert t["co2_g"] == pytest.approx(18 * 90)
+    # Marke nur einmal verwendbar
+    assert client.post("/api/anreise/storno", json={"undo_token": r["undo_token"]}).status_code == 410
+
+
+def test_undo_last_arrival_removes_row(app, client):
+    kiosk_login(client)
+    r = client.post("/api/anreise", json={"employee_id": 1, "mode_id": mode_id(app, "Bus")}).get_json()
+    client.post("/api/anreise/storno", json={"undo_token": r["undo_token"]})
+    from anreise.app import get_db
+    with app.app_context():
+        assert get_db().execute("SELECT COUNT(*) FROM daily_totals").fetchone()[0] == 0
+
+
+def test_undo_expires(app, client):
+    app.config["UNDO_SECONDS"] = 0
+    app.config["UNDO_GRACE_SECONDS"] = -1
+    kiosk_login(client)
+    r = client.post("/api/anreise", json={"employee_id": 1, "mode_id": mode_id(app, "Bus")}).get_json()
+    assert client.post("/api/anreise/storno", json={"undo_token": r["undo_token"]}).status_code == 410
+    assert client.get("/api/uebersicht").get_json()["today"]["trips"] == 1
+
+
+def test_undo_requires_login_and_valid_token(app, client):
+    kiosk_login(client)
+    r = client.post("/api/anreise", json={"employee_id": 1, "mode_id": mode_id(app, "Bus")}).get_json()
+    other = app.test_client()
+    assert other.post("/api/anreise/storno", json={"undo_token": r["undo_token"]}).status_code == 401
+    assert client.post("/api/anreise/storno", json={"undo_token": "falsch"}).status_code == 410
+    assert client.post("/api/anreise/storno", json={}).status_code == 410
+    assert client.get("/api/uebersicht").get_json()["today"]["trips"] == 1

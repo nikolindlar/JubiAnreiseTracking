@@ -97,7 +97,8 @@ def baseline_factor(conn):
 
 
 def record_arrival(conn, day, employee_id, mode_id):
-    """Addiert eine Anreise zur Tagessumme. Gibt False zurück, wenn ungültig."""
+    """Addiert eine Anreise zur Tagessumme. Gibt die addierten Werte zurück
+    (für ein Storno) oder None, wenn die Eingabe ungültig ist."""
     emp = conn.execute(
         "SELECT distance_km FROM employees WHERE id = ? AND active = 1 AND distance_km > 0",
         (employee_id,),
@@ -106,7 +107,7 @@ def record_arrival(conn, day, employee_id, mode_id):
         "SELECT factor_g FROM modes WHERE id = ? AND active = 1", (mode_id,)
     ).fetchone()
     if emp is None or mode is None:
-        return False
+        return None
     km = emp["distance_km"]
     co2 = km * mode["factor_g"]
     base = km * baseline_factor(conn)
@@ -121,7 +122,20 @@ def record_arrival(conn, day, employee_id, mode_id):
         (day, mode_id, km, co2, base),
     )
     conn.commit()
-    return True
+    return {"day": day, "mode_id": mode_id, "km": km, "co2_g": co2, "baseline_g": base}
+
+
+def revert_arrival(conn, entry):
+    """Zieht eine zuvor mit record_arrival addierte Anreise wieder ab."""
+    cur = conn.execute(
+        """UPDATE daily_totals SET trips = trips - 1, km = km - ?,
+                  co2_g = co2_g - ?, baseline_g = baseline_g - ?
+           WHERE day = ? AND mode_id = ? AND trips > 0""",
+        (entry["km"], entry["co2_g"], entry["baseline_g"], entry["day"], entry["mode_id"]),
+    )
+    conn.execute("DELETE FROM daily_totals WHERE trips <= 0")
+    conn.commit()
+    return cur.rowcount == 1
 
 
 def totals(conn, day_from, day_to):
