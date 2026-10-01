@@ -221,12 +221,23 @@
     document.getElementById('dash-date').textContent = day;
     setAll('.year', d.year);
 
-    renderPanel(document.getElementById('p-today'), d.today,
+    var pToday = document.getElementById('p-today');
+    renderPanel(pToday, d.today,
       'Erfasst: <strong>' + d.today.trips + ' von ' + d.staff + '</strong> Mitarbeitenden', d.baseline_factor_g);
+    if (d.today.hidden) {
+      // Datenschutz: Tageswerte erst ab einer Mindestzahl an Anreisen
+      pToday.querySelector('.avg').innerHTML = 'Die heutigen Werte erscheinen, sobald <strong>' +
+        d.min_trips_today + ' Anreisen</strong> erfasst sind.';
+      pToday.querySelector('.extra').textContent = 'So bleibt anonym, wie die Ersten des Tages angereist sind.';
+    }
     var y = d.year_total;
     renderPanel(document.getElementById('p-year'), y,
       y.green_share == null ? '' : 'Klimafreundlich: <strong>' + pct(y.green_share) + '</strong> aller Anreisen',
       d.baseline_factor_g);
+    if (d.today.hidden) {
+      var yx = document.querySelector('#p-year .extra');
+      yx.innerHTML += (yx.innerHTML ? ' · ' : '') + 'Stand: bis gestern';
+    }
 
     renderModes(d.by_mode);
 

@@ -23,9 +23,14 @@ den CO₂-Ausstoß pro Tag und Jahr im Empfangsbereich an.
   Server nur im Arbeitsspeicher eine zufällige Storno-Marke mit Tag, Verkehrsmittel, km und
   CO₂-Werten, ohne Name. Die Marke verfällt nach 30 Sekunden (20 s plus Puffer für die
   Übertragung) und geht bei einem Neustart verloren.
-- **Einschränkung:** Bei wenigen Personen lassen sich aus den Summen Rückschlüsse ziehen,
-  zum Beispiel wenn jemand das Anreise-Dashboard direkt nach einer Buchung beobachtet oder
-  nur eine Person mit dem Motorrad kommt.
+- **Schwelle für Tageswerte:** Die Anreisen des laufenden Tages erscheinen im Anreise-Dashboard
+  erst, wenn mindestens 3 erfasst sind (in der Verwaltung einstellbar). Bis dahin fließen sie
+  nirgends ein, auch nicht in Jahreswerte, Anteile, Verlauf oder Rekorde, und sind auch über die
+  Schnittstelle nicht abrufbar. Das Dashboard zeigt dann „Stand: bis gestern“.
+- **Einschränkung:** Ab der Schwelle wird jede weitere Buchung sofort sichtbar. Wer das Dashboard
+  direkt vor und nach einer Buchung vergleicht, kann weiterhin auf diese eine Anreise schließen.
+  Bei wenigen Personen sind außerdem Rückschlüsse aus den Summen möglich, etwa wenn nur eine
+  Person mit dem Motorrad kommt.
 - Die Erfassung ist durch ein eigenes Passwort geschützt. Jedes Tablet meldet sich einmal an
   und bleibt dann über ein Cookie bis zu 400 Tage angemeldet, auch über Neustarts hinweg.
   Die Verwaltungsanmeldung läuft nach 12 Stunden ab. Wer in der Verwaltung angemeldet ist,

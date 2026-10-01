@@ -94,6 +94,8 @@ DEFAULT_SETTINGS = {
     "meals_mixed_kg_per_day": "5.63",     # mittlerer Fleischkonsum (50–99 g/Tag)
     # Empfangsbildschirm: Seitenwechsel in Sekunden, 0 = aus
     "screen_rotation_seconds": "30",
+    # Datenschutz: Werte des laufenden Tages erst ab so vielen Anreisen zeigen
+    "privacy_min_trips_today": "3",
 }
 
 # Name, Gesamtstrecke hin + zurück in km (einfache Strecke × 2)
@@ -206,17 +208,30 @@ def daily_rows(conn):
     ).fetchall()
 
 
-def overview(conn, today):
-    """Alle Kennzahlen für das Anreise-Dashboard (heute und laufendes Jahr)."""
-    day = today.isoformat()
+def overview(conn, today, min_trips_today=0):
+    """Alle Kennzahlen für das Anreise-Dashboard (heute und laufendes Jahr).
+
+    Datenschutz: Solange heute weniger als `min_trips_today` Anreisen erfasst
+    sind, fließen die heutigen Werte nirgends ein (auch nicht in Jahreswerte,
+    Anteile, Verlauf und Rekorde). Sonst ließe sich aus der Veränderung der
+    Jahreswerte auf die ersten Personen des Tages schließen."""
+    from datetime import timedelta
     year_start = today.replace(month=1, day=1).isoformat()
+    today_trips = totals(conn, today.isoformat(), today.isoformat())["trips"]
+    today_hidden = today_trips < min_trips_today
+    # Letzter Tag, der in die Auswertung eingeht
+    day = (today - timedelta(days=1) if today_hidden else today).isoformat()
 
     def enrich(t):
         t["avg_g_per_km"] = t["co2_g"] / t["km"] if t["km"] else None
         t["saved_g"] = t["baseline_g"] - t["co2_g"]
         return t
 
-    today_t = enrich(totals(conn, day, day))
+    if today_hidden:
+        today_t = enrich({"trips": 0, "km": 0, "co2_g": 0, "baseline_g": 0})
+    else:
+        today_t = enrich(totals(conn, day, day))
+    today_t["hidden"] = today_hidden
     year_t = enrich(totals(conn, year_start, day))
 
     by_mode = [dict(r) for r in conn.execute(
@@ -239,8 +254,9 @@ def overview(conn, today):
     prev_avg = prev["co2_g"] / prev["km"] if prev["km"] else None
 
     return {
-        "date": day,
+        "date": today.isoformat(),
         "year": today.year,
+        "min_trips_today": min_trips_today,
         "monthly": monthly(conn, today.year, day),
         "prev_year": {"year": today.year - 1, "avg_g_per_km": prev_avg, "trips": prev["trips"]},
         "today": today_t,
