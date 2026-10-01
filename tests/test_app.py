@@ -322,3 +322,25 @@ def test_migration_adds_mode_flags(tmp_path):
         rows = {r["label"]: (r["is_green"], r["is_human"])
                 for r in get_db().execute("SELECT label, is_green, is_human FROM modes")}
     assert rows == {"Fahrrad/E-Bike": (1, 1), "Bus": (1, 0), "E-Auto": (0, 0)}
+
+
+def test_monthly_trend_and_previous_year(app, client):
+    kiosk_login(client)
+    bus, car = mode_id(app, "Bus"), mode_id(app, "Auto (Verbrenner)")
+    app.state["today"] = date(2025, 6, 10)
+    client.post("/api/anreise", json={"employee_id": 1, "mode_id": car})   # 2025: 230 g/km
+    app.state["today"] = date(2026, 2, 3)
+    client.post("/api/anreise", json={"employee_id": 1, "mode_id": car})
+    app.state["today"] = date(2026, 4, 1)
+    client.post("/api/anreise", json={"employee_id": 1, "mode_id": bus})
+    d = client.get("/api/uebersicht").get_json()
+    avg = [m["avg_g_per_km"] for m in d["monthly"]]
+    assert len(avg) == 12
+    assert avg[1] == pytest.approx(230) and avg[3] == pytest.approx(90)
+    assert avg[0] is None and avg[2] is None and avg[11] is None
+    assert d["prev_year"] == {"year": 2025, "avg_g_per_km": pytest.approx(230), "trips": 1}
+
+
+def test_previous_year_empty(app, client):
+    d = client.get("/api/uebersicht").get_json()
+    assert d["prev_year"]["avg_g_per_km"] is None

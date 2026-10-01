@@ -69,6 +69,8 @@ Das E-Auto wird genauso umgerechnet (70 × 1,4 ≈ 98 g/Pkm). Der Verbrenner-Wer
 - **Eingespartes CO₂ als Flüge** ab München, einfache Strecke, pro Person. Näherung:
   Entfernung × 290 g/km (UBA Inlandsflug 2024) bzw. × 210 g/km (abgeleitet aus dem
   UBA-Beispiel Frankfurt–New York).
+- **Ø g CO₂/km je Monat** als Verlauf, mit dem Vorjahresdurchschnitt als gestrichelter Linie
+  (sobald Daten aus dem Vorjahr vorliegen).
 - **Rekorde:** bester Tag nach Anteil klimafreundlich und längste Serie von Tagen mit
   mindestens 50 % klimafreundlich. Gezählt werden nur Tage mit mindestens 5 Anreisen;
   Tage ohne genug Daten (Wochenende) unterbrechen die Serie nicht.

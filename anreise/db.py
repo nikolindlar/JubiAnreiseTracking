@@ -213,9 +213,14 @@ def overview(conn, today):
     staff = conn.execute(
         "SELECT COUNT(*) FROM employees WHERE active = 1 AND distance_km > 0").fetchone()[0]
 
+    prev = totals(conn, f"{today.year - 1}-01-01", f"{today.year - 1}-12-31")
+    prev_avg = prev["co2_g"] / prev["km"] if prev["km"] else None
+
     return {
         "date": day,
         "year": today.year,
+        "monthly": monthly(conn, today.year, day),
+        "prev_year": {"year": today.year - 1, "avg_g_per_km": prev_avg, "trips": prev["trips"]},
         "today": today_t,
         "year_total": year_t,
         "staff": staff,
@@ -248,3 +253,14 @@ def records(conn, day_from, day_to, min_trips=RECORD_MIN_TRIPS, threshold=0.5):
         longest = max(longest, streak)
     return {"best_day": best, "longest_streak": longest,
             "min_trips": min_trips, "days_counted": len(days)}
+
+
+def monthly(conn, year, day_to):
+    """Ø g CO2/km je Monat des Jahres bis einschließlich day_to (None ohne Daten)."""
+    rows = {r["m"]: r for r in conn.execute(
+        """SELECT CAST(substr(day, 6, 2) AS INTEGER) AS m, SUM(km) AS km, SUM(co2_g) AS co2_g
+           FROM daily_totals WHERE day BETWEEN ? AND ? GROUP BY m""",
+        (f"{year}-01-01", day_to))}
+    return [{"month": m,
+             "avg_g_per_km": rows[m]["co2_g"] / rows[m]["km"] if m in rows and rows[m]["km"] else None}
+            for m in range(1, 13)]

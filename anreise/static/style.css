@@ -89,8 +89,8 @@ button { font: inherit; cursor: pointer; }
 .hint { color: var(--muted); }
 
 /* ---------- Übersicht (Empfang) ---------- */
-.dashboard main { max-width: 1800px; padding-top: 20px; }
-.dash-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; margin-bottom: 16px; }
+.dashboard main { max-width: 1800px; padding-top: 14px; padding-bottom: 12px; }
+.dash-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; margin-bottom: 10px; }
 .dash-head h1 { margin: 0; font-size: clamp(1.8rem, 3vw, 2.8rem); }
 .dash-date { margin: 0; color: var(--muted); font-size: 1.2rem; }
 .panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
@@ -111,13 +111,13 @@ button { font: inherit; cursor: pointer; }
 .facts { list-style: none; margin: 12px 0 0; padding: 0; color: var(--muted); font-size: 1.05rem; }
 .facts li { margin-top: 4px; }
 .facts strong, .tile-text strong { color: var(--fg); }
-.legend { color: var(--muted); margin: 12px 0 20px; }
+.legend { color: var(--muted); margin: 10px 0 14px; }
 .legend.small { margin: 12px 0 0; font-size: .9rem; }
 .sw { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; margin: 0 4px 0 12px; }
 .legend .sw:first-child { margin-left: 0; }
 
-.tiles-grid { display: grid; grid-template-columns: minmax(320px, 1.3fr) 1fr 1fr; gap: 20px; }
-.tile-col { display: grid; gap: 20px; align-content: start; }
+.tiles-grid { display: grid; grid-template-columns: minmax(320px, 1.3fr) 1fr 1fr; gap: 16px; }
+.tile-col { display: grid; gap: 16px; align-content: start; }
 .tile-value { margin: 0; font-size: clamp(1.8rem, 2.8vw, 2.6rem); font-weight: 800; line-height: 1.15; }
 .tile-text { margin: 6px 0 0; color: var(--muted); font-size: 1.1rem; }
 .mode-row { display: grid; grid-template-columns: 2.6em minmax(8em, 14em) 1fr 3.5em; align-items: center; gap: 10px; margin-bottom: 8px; }
@@ -127,7 +127,16 @@ button { font: inherit; cursor: pointer; }
 .record { display: flex; align-items: baseline; gap: 10px; margin-top: 8px; }
 .record-value { font-size: 1.8rem; font-weight: 800; white-space: nowrap; }
 .record-text { color: var(--muted); }
-.footnote { color: var(--muted); font-size: .8rem; margin-top: 16px; }
+.trend svg { width: 100%; height: auto; display: block; overflow: visible; }
+.trend .axis { stroke: var(--line); stroke-width: 1; }
+.trend .trend-line { fill: none; stroke: var(--actual); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.trend .dot { fill: var(--actual); stroke: var(--card); stroke-width: 2; }
+.trend .hit { fill: transparent; }
+.trend .pt:hover .dot { r: 6; }
+.trend .prev-line { stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.trend text { font-size: 12px; fill: var(--muted); }
+.trend .val-label { fill: var(--fg); font-weight: 700; font-size: 14px; }
+.footnote { color: var(--muted); font-size: .8rem; margin: 10px 0 0; }
 
 @media (max-width: 1100px) {
   .tiles-grid { grid-template-columns: 1fr 1fr; }
