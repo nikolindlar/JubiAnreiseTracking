@@ -5,13 +5,13 @@ import os
 import secrets
 import threading
 import time
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from functools import wraps
 
 from flask import (Flask, Response, abort, g, jsonify, redirect, render_template,
                    request, session, url_for)
 
-from . import db, vergleiche
+from . import db, pv, vergleiche
 
 
 def create_app(config=None):
@@ -30,6 +30,8 @@ def create_app(config=None):
         UNDO_GRACE_SECONDS=10,
         SESSION_COOKIE_SAMESITE="Lax",
         TODAY=date.today,  # überschreibbar für Tests
+        PV_COLLECTOR=True,      # Hintergrundabfrage des Wechselrichters
+        PV_INTERVAL_SECONDS=60,
     )
     if config:
         app.config.update(config)
@@ -38,6 +40,15 @@ def create_app(config=None):
 
     with app.app_context():
         db.init_db(get_db())
+        pv.init_db(get_db())
+
+    app.extensions["pv_collector"] = None
+    if app.config["PV_COLLECTOR"] and not app.config.get("TESTING"):
+        path = app.config["DATABASE"]
+        collector = pv.Collector(lambda: db.connect(path), db.get_settings,
+                                 app.config["PV_INTERVAL_SECONDS"])
+        collector.start()
+        app.extensions["pv_collector"] = collector
 
     # Storno-Marken nur im Arbeitsspeicher: Marke -> addierte Werte (ohne Name),
     # verfallen nach wenigen Sekunden und gehen bei einem Neustart verloren.
@@ -118,6 +129,19 @@ def kiosk_required(view):
     return wrapper
 
 
+def pv_status(conn, collector):
+    """Kurzer Status der PV-Abfrage für die Verwaltung."""
+    import time as _t
+    state = conn.execute("SELECT ts FROM pv_state WHERE id = 1").fetchone()
+    last = state["ts"] if state else None
+    return {
+        "last": datetime.fromtimestamp(last).strftime("%d.%m.%Y %H:%M") if last else None,
+        "fresh": bool(last and _t.time() - last <= pv.STALE_AFTER),
+        "error": collector.last_error if collector else None,
+        "running": collector is not None,
+    }
+
+
 def parse_float(value, default=0.0):
     try:
         return max(0.0, float(str(value).replace(",", ".")))
@@ -131,8 +155,14 @@ def register_routes(app):
 
     # ---------- Dashboards (Empfang) ----------
     # Reihenfolge = Reihenfolge des Seitenwechsels am Empfangsbildschirm
-    dashboards = ["dashboard_travel", "dashboard_meals"]
-    dashboard_names = {"dashboard_travel": "Anreise-Dashboard", "dashboard_meals": "Verpflegungs-Dashboard"}
+    dashboard_names = {"dashboard_travel": "Anreise-Dashboard", "dashboard_meals": "Verpflegungs-Dashboard",
+                       "dashboard_pv": "PV-Dashboard"}
+
+    def dashboards():
+        pages = ["dashboard_travel", "dashboard_meals"]
+        if db.get_settings(get_db()).get("pv_source", "").strip():
+            pages.append("dashboard_pv")
+        return pages
 
     @app.get("/")
     def index():
@@ -150,6 +180,20 @@ def register_routes(app):
     def dashboard_meals():
         return render_template("dashboard_verpflegung.html", **screen_context("dashboard_meals"))
 
+    @app.get("/dashboard/pv")
+    def dashboard_pv():
+        return render_template("dashboard_pv.html", **screen_context("dashboard_pv"))
+
+    @app.get("/api/dashboard/pv")
+    def api_pv():
+        data = pv.overview(get_db(), today(), db.get_settings(get_db()))
+        y = data["year_total"]
+        data["compare"] = {
+            "flights": vergleiche.vergleich(y["co2_avoided_kg"] * 1000, vergleiche.FLUEGE),
+            "ev_km": y["pv_kwh"] / data["ev_kwh_per_100km"] * 100 if data["ev_kwh_per_100km"] else None,
+        }
+        return jsonify(data)
+
     @app.get("/api/dashboard/verpflegung")
     def api_nutrition():
         data = db.nutrition(db.get_settings(get_db()), today())
@@ -159,7 +203,9 @@ def register_routes(app):
     def screen_context(current):
         """Seitenwechsel für den Empfangsbildschirm: nur aktiv, wenn die Seite
         mit ?empfang aufgerufen wird (z. B. http://<pi>:8080/?empfang)."""
-        pages = dashboards
+        pages = dashboards()
+        if current not in pages:
+            pages = pages + [current]
         seconds = 0
         if "empfang" in request.args:
             try:
@@ -274,9 +320,10 @@ def register_routes(app):
             "SELECT * FROM employees ORDER BY name COLLATE NOCASE").fetchall()
         modes = conn.execute("SELECT * FROM modes ORDER BY sort").fetchall()
         settings = db.get_settings(conn)
+        collector = app.extensions.get("pv_collector")
         return render_template("admin.html", employees=employees, modes=modes,
                                settings=settings, closed=db.closed_months(settings),
-                               csrf=session["csrf"])
+                               pv_status=pv_status(conn, collector), csrf=session["csrf"])
 
     @app.post("/verwaltung/mitarbeitende")
     @admin_required
@@ -345,6 +392,19 @@ def register_routes(app):
                            f"{int(parse_float(f.get('privacy_min_trips_today'), 3))}")
         conn.commit()
         return redirect(url_for("admin") + "#einstellungen")
+
+    @app.post("/verwaltung/pv")
+    @admin_required
+    def pv_settings_update():
+        conn = get_db()
+        f = request.form
+        db.set_setting(conn, "pv_source", (f.get("pv_source") or "").strip())
+        kwp = parse_float(f.get("pv_kwp"))
+        db.set_setting(conn, "pv_kwp", f"{kwp:g}" if kwp else "")
+        db.set_setting(conn, "pv_co2_g_per_kwh", f"{parse_float(f.get('pv_co2_g_per_kwh'), 344):g}")
+        db.set_setting(conn, "pv_ev_kwh_per_100km", f"{parse_float(f.get('pv_ev_kwh_per_100km'), 18) or 18:g}")
+        conn.commit()
+        return redirect(url_for("admin") + "#pv")
 
     @app.get("/verwaltung/export.csv")
     @admin_required

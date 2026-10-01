@@ -8,6 +8,7 @@
     <nav>
       <a href="{{ url_for('dashboard_travel') }}">Anreise-Dashboard</a>
       <a href="{{ url_for('dashboard_meals') }}">Verpflegungs-Dashboard</a>
+      <a href="{{ url_for('dashboard_pv') }}">PV-Dashboard</a>
       <a href="{{ url_for('kiosk') }}">Erfassung</a>
       <a href="{{ url_for('export_csv') }}">CSV-Export</a>
       <form method="post" action="{{ url_for('logout') }}"><button>Abmelden</button></form>
@@ -97,6 +98,30 @@
       <input name="privacy_min_trips_today" value="{{ settings.privacy_min_trips_today }}" inputmode="numeric" size="4"></label>
     <p class="hint">Bis dahin fließen die Anreisen des Tages in keine Anzeige ein, auch nicht in die Jahreswerte.
       So lässt sich nicht erkennen, wie die ersten Personen des Tages angereist sind. 0 = sofort anzeigen.</p>
+    <button>Speichern</button>
+  </form>
+
+  <h2 id="pv">PV-Anlage</h2>
+  <p class="hint">Abfrage des Fronius-Wechselrichters über die lokale Solar API (nur lesend, jede Minute).
+    Die Solar API muss im Menü des Wechselrichters aktiviert sein (Kommunikation → Solar API).
+    Mit <code>demo</code> läuft eine simulierte Anlage zum Testen. Leer = aus.</p>
+  <form method="post" action="{{ url_for('pv_settings_update') }}" class="settings">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>IP-Adresse des Wechselrichters
+      <input name="pv_source" value="{{ settings.pv_source }}" placeholder="z. B. 192.168.1.50 oder demo" size="22"></label>
+    <p class="hint">Status:
+      {% if not settings.pv_source %}nicht eingerichtet
+      {% elif pv_status.fresh %}<strong>verbunden</strong>, letzte Abfrage {{ pv_status.last }}
+      {% elif pv_status.last %}<span class="warn">keine aktuellen Daten</span>, letzte erfolgreiche Abfrage {{ pv_status.last }}
+      {% else %}<span class="warn">noch keine Daten</span>{% endif %}
+      {% if pv_status.error %}<br><span class="warn">Fehler: {{ pv_status.error }}</span>{% endif %}</p>
+    <label>Anlagenleistung der Module in kWp (optional, für den spezifischen Ertrag)
+      <input name="pv_kwp" value="{{ settings.pv_kwp }}" inputmode="decimal" size="6"></label>
+    <label>g CO₂ pro kWh Netzstrom (vermiedene Emissionen)
+      <input name="pv_co2_g_per_kwh" value="{{ settings.pv_co2_g_per_kwh }}" inputmode="decimal" size="6"></label>
+    <p class="hint">Voreinstellung 344 g: Umweltbundesamt, CO₂-Emissionsfaktor des deutschen Strommix 2025 (erste Schätzung).</p>
+    <label>kWh pro 100 km E-Auto (für den Vergleich „reicht für … km“)
+      <input name="pv_ev_kwh_per_100km" value="{{ settings.pv_ev_kwh_per_100km }}" inputmode="decimal" size="5"></label>
     <button>Speichern</button>
   </form>
 </main>
