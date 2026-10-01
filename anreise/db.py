@@ -207,7 +207,7 @@ def daily_rows(conn):
 
 
 def overview(conn, today):
-    """Alle Kennzahlen für die Übersicht (heute und laufendes Jahr)."""
+    """Alle Kennzahlen für das Anreise-Dashboard (heute und laufendes Jahr)."""
     day = today.isoformat()
     year_start = today.replace(month=1, day=1).isoformat()
 

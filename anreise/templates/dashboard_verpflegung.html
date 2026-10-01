@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}CO₂ unserer Verpflegung{% endblock %}
+{% block title %}Verpflegungs-Dashboard{% endblock %}
 {% block bodyclass %}dashboard{% endblock %}
 {% block body %}
 <main>
@@ -108,7 +108,7 @@
   }
 
   function load() {
-    fetch('/api/ernaehrung').then(function (r) { return r.json(); }).then(render).catch(function () {});
+    fetch('/api/dashboard/verpflegung').then(function (r) { return r.json(); }).then(render).catch(function () {});
   }
   load();
   setInterval(load, 10 * 60 * 1000);
