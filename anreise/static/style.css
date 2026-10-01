@@ -10,6 +10,8 @@
   --baseline: #9aa39d;
   --danger: #b3261e;
   --warn-bg: #fff4d6;
+  --pv: #eb6834;      /* Solarstrom */
+  --load: #2a78d6;    /* Verbrauch */
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -23,6 +25,8 @@
     --baseline: #6b756f;
     --danger: #ef6b61;
     --warn-bg: #3b3218;
+    --pv: #d95926;
+    --load: #3987e5;
   }
 }
 * { box-sizing: border-box; }
@@ -155,6 +159,40 @@ button { font: inherit; cursor: pointer; }
 .saved { font-size: clamp(1.6rem, 2.6vw, 2.4rem); margin: 20px 0 8px; color: var(--muted); }
 .saved strong { color: var(--accent); }
 @media (max-width: 1000px) { .nutri-grid { grid-template-columns: 1fr; } }
+/* ---------- PV-Dashboard ---------- */
+.demo-badge { font-size: .9rem; font-weight: 600; vertical-align: middle; margin-left: 12px; padding: 3px 10px;
+  border-radius: 999px; background: var(--warn-bg); color: var(--fg); }
+.pv-color { color: var(--pv); }
+.pv-top { display: grid; grid-template-columns: minmax(320px, 1fr) 2.2fr; gap: 16px; align-items: stretch; }
+.flow { list-style: none; margin: 8px 0 0; padding: 0; }
+.flow li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line);
+  color: var(--muted); font-size: 1.15rem; }
+.flow strong { color: var(--fg); font-size: 1.4rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.flow strong.pv-color { color: var(--pv); }
+.facts-line { margin: 8px 0 0; color: var(--muted); font-size: 1.1rem; }
+.facts-line strong { color: var(--fg); }
+.dash-tile .tile-text strong { white-space: nowrap; }
+.pv-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 16px; }
+.pv-curve svg, .pv-months svg { display: block; overflow: visible; }
+.pv-curve .grid, .pv-months .axis { stroke: var(--line); stroke-width: 1; }
+.pv-curve .axis-label, .pv-months .axis-label { font-size: 13px; fill: var(--muted); }
+.pv-curve .pv-area { fill: var(--pv); fill-opacity: .22; }
+.pv-curve .pv-line { fill: none; stroke: var(--pv); stroke-width: 2; stroke-linejoin: round; }
+.pv-curve .load-line { fill: none; stroke: var(--load); stroke-width: 2; stroke-linejoin: round; }
+.pv-curve .hit, .pv-months .hit { fill: transparent; }
+.pv-curve .hit:hover { fill: var(--line); fill-opacity: .5; }
+.pv-months .pv-bar { fill: var(--pv); }
+.pv-months g:hover .pv-bar { opacity: .8; }
+.pv-months .prev-tick { stroke: var(--muted); stroke-width: 2; stroke-dasharray: 4 3; }
+.pv-months .val-label { font-size: 14px; font-weight: 700; fill: var(--fg); }
+.sw.sw-pv { background: var(--pv); }
+.sw.sw-load { background: var(--load); }
+.sw.sw-prev { background: transparent; border-top: 2px dashed var(--muted); height: 0; border-radius: 0; vertical-align: middle; }
+@media (max-width: 1100px) {
+  .pv-top { grid-template-columns: 1fr; }
+  .pv-tiles { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 600px) { .pv-tiles { grid-template-columns: 1fr; } }
 .footnote { color: var(--muted); font-size: .8rem; margin: 10px 0 0; }
 
 @media (max-width: 1100px) {

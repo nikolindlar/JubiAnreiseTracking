@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+{% block title %}PV-Dashboard{% endblock %}
+{% block bodyclass %}dashboard{% endblock %}
+{% block body %}
+<main>
+  <header class="dash-head">
+    <h1>Sonnenstrom von unserem Dach <span class="demo-badge" id="demo-badge" hidden>Demo-Daten</span></h1>
+    <div class="dash-meta"><p class="dash-date" id="dash-date"></p></div>
+  </header>
+
+  <section class="panel" id="pv-off" hidden>
+    <h2>Die PV-Anlage ist noch nicht angebunden</h2>
+    <p class="tile-text">Sobald die IP-Adresse des Wechselrichters in der Verwaltung eingetragen ist, erscheinen hier die Werte.</p>
+  </section>
+
+  <div id="pv-on" hidden>
+    <div class="pv-top">
+      <section class="panel" id="pv-now">
+        <h2>Jetzt</h2>
+        <p class="hero"><span class="hero-value pv-color" id="now-pv">–</span> <span class="hero-label">Sonnenstrom</span></p>
+        <ul class="flow" id="now-flow"></ul>
+      </section>
+      <section class="panel" id="pv-today">
+        <div class="trend-head">
+          <h2>Heute</h2>
+          <p class="legend small"><span class="sw sw-pv"></span> Erzeugung <span class="sw sw-load"></span> Verbrauch im Haus</p>
+        </div>
+        <div class="pv-curve" id="today-curve"></div>
+        <p class="facts-line" id="today-facts"></p>
+      </section>
+    </div>
+
+    <div class="pv-tiles">
+      <section class="panel dash-tile">
+        <h2>Erzeugt <span class="year"></span></h2>
+        <p class="tile-value" id="y-pv"></p>
+        <p class="tile-text" id="y-pv-text"></p>
+      </section>
+      <section class="panel dash-tile">
+        <h2>Vermiedenes CO₂ <span class="year"></span></h2>
+        <p class="tile-value" id="y-co2"></p>
+        <p class="tile-text" id="y-co2-text"></p>
+      </section>
+      <section class="panel dash-tile">
+        <h2>Selbst genutzt</h2>
+        <p class="tile-value" id="y-self"></p>
+        <p class="tile-text" id="y-self-text"></p>
+      </section>
+      <section class="panel dash-tile">
+        <h2>Stromnetz <span class="year"></span></h2>
+        <p class="tile-value" id="y-export"></p>
+        <p class="tile-text" id="y-export-text"></p>
+      </section>
+    </div>
+
+    <section class="panel trend-panel">
+      <div class="trend-head">
+        <h2>Erzeugung je Monat <span class="year"></span></h2>
+        <p class="legend small" id="month-legend"><span class="sw sw-pv"></span> <span class="year"></span></p>
+      </div>
+      <div class="pv-months" id="months"></div>
+    </section>
+  </div>
+
+  <p class="footnote">Daten: Fronius-Wechselrichter und Smart Meter, Abfrage jede Minute. Vermiedenes CO₂ = erzeugter
+    Solarstrom × <span id="f-co2"></span> g CO₂/kWh (Umweltbundesamt, deutscher Strommix 2025, erste Schätzung).
+    E-Auto: Annahme <span id="f-ev"></span> kWh/100 km. Flüge: einfache Strecke ab München (Näherung).</p>
+</main>
+
+<script>
+(function () {
+  var nf0 = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 });
+  var nf1 = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 1 });
+  var MONTHS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+  var MONTH_NAMES = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September',
+    'Oktober', 'November', 'Dezember'];
+  var last = null;
+
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+  function kw(v) { return nf1.format(v) + ' kW'; }
+  function kwh(v) {
+    if (v >= 10000) return nf1.format(v / 1000) + ' MWh';
+    return (v < 10 ? nf1 : nf0).format(v) + ' kWh';
+  }
+  function mass(kg) {
+    if (kg >= 1000) return nf1.format(kg / 1000) + ' t';
+    return (kg < 10 ? nf1 : nf0).format(kg) + ' kg';
+  }
+  function pct(v) { return v == null ? '–' : nf0.format(v * 100) + ' %'; }
+
+  function renderNow(d) {
+    var el = document.getElementById('now-flow');
+    if (!d.live) {
+      document.getElementById('now-pv').textContent = '–';
+      el.innerHTML = '<li>Keine aktuellen Daten vom Wechselrichter' + (d.last_ts
+        ? ' (zuletzt ' + new Date(d.last_ts * 1000).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) + ' Uhr)'
+        : '') + '</li>';
+      return;
+    }
+    var l = d.live;
+    document.getElementById('now-pv').textContent = kw(l.pv_kw);
+    var rows = [];
+    if (l.load_kw != null) rows.push('<li><span>Verbrauch im Haus</span><strong>' + kw(l.load_kw) + '</strong></li>');
+    if (l.grid_kw != null) {
+      rows.push(l.grid_kw < -0.05
+        ? '<li><span>Ins Netz eingespeist</span><strong class="pv-color">' + kw(-l.grid_kw) + '</strong></li>'
+        : '<li><span>Aus dem Netz bezogen</span><strong>' + kw(Math.max(l.grid_kw, 0)) + '</strong></li>');
+    }
+    if (l.load_kw) {
+      rows.push('<li><span>Anteil Sonnenstrom am Verbrauch</span><strong>' +
+        pct(Math.min(l.pv_kw, l.load_kw) / l.load_kw) + '</strong></li>');
+    }
+    el.innerHTML = rows.join('');
+  }
+
+  function renderCurve(d) {
+    var el = document.getElementById('today-curve');
+    var W = Math.max(300, el.clientWidth), H = 260, L = 44, R = 8, T = 10, B = 24;
+    var pts = d.curve;
+    if (!pts.length) { el.innerHTML = '<p class="tile-text">Noch keine Werte für heute</p>'; return; }
+    var max = Math.max.apply(null, pts.map(function (p) { return Math.max(p.pv_kw, p.load_kw || 0); }).concat([1]));
+    max = Math.ceil(max / 5) * 5;
+    var x = function (t) { return L + (W - L - R) * (t - d.day_start) / 86400; };
+    var y = function (v) { return T + (H - T - B) * (1 - v / max); };
+    var svg = '<svg width="' + W + '" height="' + H + '" role="img" aria-label="Erzeugung und Verbrauch heute">';
+    for (var g = 0; g <= max; g += max / 2) {
+      svg += '<line class="grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + y(g) + '" y2="' + y(g) + '"/>' +
+        '<text class="axis-label" x="' + (L - 6) + '" y="' + (y(g) + 4) + '" text-anchor="end">' + nf0.format(g) + ' kW</text>';
+    }
+    // Erzeugung als Fläche, Verbrauch als Linie
+    var area = 'M' + x(pts[0].t) + ',' + y(0) + pts.map(function (p) { return ' L' + x(p.t) + ',' + y(p.pv_kw); }).join('') +
+      ' L' + x(pts[pts.length - 1].t) + ',' + y(0) + ' Z';
+    svg += '<path class="pv-area" d="' + area + '"/>';
+    svg += '<polyline class="pv-line" points="' + pts.map(function (p) { return x(p.t) + ',' + y(p.pv_kw); }).join(' ') + '"/>';
+    var load = pts.filter(function (p) { return p.load_kw != null; });
+    if (load.length > 1) {
+      svg += '<polyline class="load-line" points="' + load.map(function (p) { return x(p.t) + ',' + y(p.load_kw); }).join(' ') + '"/>';
+    }
+    // Hover-Bereiche je Viertelstunde
+    var slotW = (W - L - R) / 96;
+    pts.forEach(function (p) {
+      var time = new Date(p.t * 1000).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+      svg += '<rect class="hit" x="' + x(p.t) + '" y="' + T + '" width="' + slotW + '" height="' + (H - T - B) + '"><title>' +
+        time + ' Uhr: Erzeugung ' + kw(p.pv_kw) + (p.load_kw != null ? ', Verbrauch ' + kw(p.load_kw) : '') + '</title></rect>';
+    });
+    var step = W < 640 ? 6 : 3;
+    for (var h = step; h < 24; h += step) {
+      svg += '<text class="axis-label" x="' + x(d.day_start + h * 3600) + '" y="' + (H - 6) + '" text-anchor="middle">' + h + ' Uhr</text>';
+    }
+    el.innerHTML = svg + '</svg>';
+  }
+
+  function renderMonths(d) {
+    var el = document.getElementById('months');
+    var W = Math.max(300, el.clientWidth), H = 180, L = 8, R = 8, T = 22, B = 24;
+    var vals = d.monthly, prev = d.monthly_prev;
+    var all = vals.concat(prev || []).filter(function (v) { return v != null; });
+    if (!all.length) { el.innerHTML = '<p class="tile-text">Noch keine Daten</p>'; return; }
+    var max = Math.max.apply(null, all.concat([1])) * 1.15;
+    var narrow = W < 640;
+    var slot = (W - L - R) / 12, bw = Math.min(56, slot * 0.6);
+    var y = function (v) { return T + (H - T - B) * (1 - v / max); };
+    var svg = '<svg width="' + W + '" height="' + H + '" role="img" aria-label="Erzeugung je Monat">';
+    svg += '<line class="axis" x1="' + L + '" x2="' + (W - R) + '" y1="' + y(0) + '" y2="' + y(0) + '"/>';
+    vals.forEach(function (v, i) {
+      var cx = L + slot * (i + 0.5);
+      if (prev && prev[i] != null) {
+        svg += '<line class="prev-tick" x1="' + (cx - bw / 2 - 4) + '" x2="' + (cx + bw / 2 + 4) + '" y1="' + y(prev[i]) + '" y2="' + y(prev[i]) + '">' +
+          '<title>' + MONTH_NAMES[i] + ' Vorjahr: ' + kwh(prev[i]) + '</title></line>';
+      }
+      if (v != null && v > 0) {
+        var top = y(v), h = y(0) - top;
+        svg += '<g><path class="pv-bar" d="M' + (cx - bw / 2) + ',' + y(0) + ' V' + (top + 4) + ' Q' + (cx - bw / 2) + ',' + top + ' ' +
+          (cx - bw / 2 + 4) + ',' + top + ' H' + (cx + bw / 2 - 4) + ' Q' + (cx + bw / 2) + ',' + top + ' ' + (cx + bw / 2) + ',' +
+          (top + 4) + ' V' + y(0) + ' Z"/><rect class="hit" x="' + (cx - slot / 2) + '" y="' + T + '" width="' + slot + '" height="' + (H - T - B) +
+          '"><title>' + MONTH_NAMES[i] + ': ' + kwh(v) + '</title></rect></g>';
+        if (!narrow && h > 0) {
+          // Zahl über Balken und Vorjahresmarke, damit nichts überlappt
+          var ly = Math.min(top, prev && prev[i] != null ? y(prev[i]) : top) - 6;
+          svg += '<text class="val-label" x="' + cx + '" y="' + ly + '" text-anchor="middle">' + nf0.format(v) + '</text>';
+        }
+      }
+      svg += '<text class="axis-label" x="' + cx + '" y="' + (H - 6) + '" text-anchor="middle">' + (narrow ? MONTHS[i].charAt(0) : MONTHS[i]) + '</text>';
+    });
+    el.innerHTML = svg + '</svg>';
+    document.getElementById('month-legend').innerHTML = '<span class="sw sw-pv"></span> ' + d.year + ' in kWh' +
+      (prev ? ' <span class="sw sw-prev"></span> Vorjahr' : '');
+  }
+
+  function render(d) {
+    last = d;
+    document.getElementById('dash-date').textContent = new Date(d.date + 'T12:00:00').toLocaleDateString('de-DE',
+      { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    document.querySelectorAll('.year').forEach(function (e) { e.textContent = d.year; });
+    document.getElementById('pv-off').hidden = d.configured;
+    document.getElementById('pv-on').hidden = !d.configured;
+    document.getElementById('demo-badge').hidden = !d.demo;
+    document.getElementById('f-co2').textContent = nf0.format(d.co2_g_per_kwh);
+    document.getElementById('f-ev').textContent = nf0.format(d.ev_kwh_per_100km);
+    if (!d.configured) return;
+
+    renderNow(d);
+    renderCurve(d);
+    var t = d.today;
+    document.getElementById('today-facts').innerHTML =
+      'Erzeugt <strong>' + kwh(t.pv_kwh) + '</strong> · selbst genutzt <strong>' + pct(t.self_use_share) +
+      '</strong> · eingespeist <strong>' + kwh(t.export_kwh) + '</strong> · Spitze <strong>' + kw(t.peak_kw) + '</strong>';
+
+    var y = d.year_total;
+    document.getElementById('y-pv').textContent = kwh(y.pv_kwh);
+    document.getElementById('y-pv-text').innerHTML = (d.compare.ev_km
+      ? 'reicht für <strong>' + nf0.format(d.compare.ev_km) + ' km</strong> mit dem E-Auto' : '') +
+      (y.specific_yield ? ' · ' + nf0.format(y.specific_yield) + ' kWh/kWp' : '');
+    document.getElementById('y-co2').textContent = mass(y.co2_avoided_kg);
+    var c = d.compare.flights;
+    document.getElementById('y-co2-text').innerHTML = !c ? '' : c.factor >= 1
+      ? 'so viel wie <strong>' + nf1.format(c.factor) + (nf1.format(c.factor) === '1' ? ' Flug ' : ' Flüge ') + esc(c.label) + '</strong>'
+      : 'so viel wie <strong>' + pct(c.factor) + ' eines Flugs ' + esc(c.label) + '</strong>';
+    document.getElementById('y-self').textContent = pct(y.self_use_share);
+    document.getElementById('y-self-text').innerHTML = 'des Solarstroms nutzt das Haus selbst · <strong>' + pct(y.autarky) +
+      '</strong> unseres Stroms kommt vom Dach';
+    // Einspeisung und Bezug in derselben Einheit
+    var big = Math.max(y.export_kwh, y.import_kwh) >= 10000;
+    var unit = function (v) { return big ? nf1.format(v / 1000) + ' MWh' : kwh(v); };
+    document.getElementById('y-export').textContent = unit(y.export_kwh);
+    document.getElementById('y-export-text').innerHTML = 'ins Netz eingespeist · <strong>' + unit(y.import_kwh) + '</strong> bezogen';
+
+    renderMonths(d);
+  }
+
+  function load() {
+    fetch('/api/dashboard/pv').then(function (r) { return r.json(); }).then(render).catch(function () {});
+  }
+  window.addEventListener('resize', function () { if (last) render(last); });
+  load();
+  setInterval(load, 60 * 1000);
+})();
+</script>
+{% include "_rotation.html" %}
+{% endblock %}

@@ -8,6 +8,7 @@ den CO₂-Ausstoß pro Tag und Jahr im Empfangsbereich an.
 | Erfassung | `http://<pi>:8080/erfassung` | Tablets an den Eingängen: Name → Verkehrsmittel (Passwort, einmalig pro Tablet) |
 | Anreise-Dashboard | `http://<pi>:8080/dashboard/anreise` | Empfang: CO₂ tatsächlich vs. „alle mit dem Auto“, Ø g CO₂/km, Beteiligung, Verkehrsmittel-Anteile, Strecke mit Vergleichen, Flug-Vergleich, Rekorde |
 | Verpflegungs-Dashboard | `http://<pi>:8080/dashboard/verpflegung` | CO₂ der vegetarischen Verpflegung vs. Mischkost (Pauschalwerte, mitlaufender Zähler), Bio-Anteil |
+| PV-Dashboard | `http://<pi>:8080/dashboard/pv` | Sonnenstrom: aktuelle Leistung, Tagesverlauf, Jahresertrag, Eigenverbrauch, Einspeisung, vermiedenes CO₂ |
 | (Startseite) | `http://<pi>:8080/` | leitet zum Anreise-Dashboard weiter |
 | Verwaltung | `http://<pi>:8080/verwaltung` | Mitarbeitende, Strecken, Verkehrsmittel, Emissionsfaktoren, CSV-Export (Passwort) |
 
@@ -100,6 +101,23 @@ Den Bildschirm auf `http://<pi>:8080/?empfang` stellen. Dann wechseln Anreise- u
 Verpflegungs-Dashboard automatisch (Standard alle 30 s, in der Verwaltung einstellbar, 0 = aus).
 In der Kopfzeile zeigt ein Countdown, wann zum nächsten Dashboard gewechselt wird.
 Ohne `?empfang` bleibt jede Seite stehen.
+
+## PV-Dashboard
+
+Datenquelle ist die lokale **Fronius Solar API** des Wechselrichters (Fronius Verto Plus, mit
+Fronius Smart Meter IP). Sie ist nur lesend und muss im Menü des Wechselrichters aktiviert werden
+(Kommunikation → Solar API). In der Verwaltung unter „PV-Anlage“ die IP-Adresse eintragen; mit
+`demo` läuft eine simulierte Anlage zum Testen. Der Pi fragt jede Minute ab.
+
+- Fronius-Hybridgeräte liefern keine fertigen Tages-/Jahreswerte, nur Gesamtzähler. Der Pi
+  speichert deshalb Tagessummen (Erzeugung, Netzbezug, Einspeisung) selbst. Ohne Zählerstand
+  wird die Energie aus der Leistung zwischen zwei Abfragen berechnet.
+- Eigenverbrauch = Erzeugung − Einspeisung; Hausverbrauch = Eigenverbrauch + Netzbezug.
+  Eigenverbrauchsquote = Eigenverbrauch / Erzeugung; Autarkiegrad = Eigenverbrauch / Hausverbrauch.
+- Vermiedenes CO₂ = Erzeugung × 344 g/kWh (UBA, Strommix 2025, erste Schätzung; einstellbar).
+- Das PV-Dashboard wird in den Seitenwechsel am Empfang aufgenommen, sobald eine Quelle eingetragen ist.
+- Fällt der Wechselrichter aus (z. B. nachts im Standby oder ohne Netz), zeigt „Jetzt“ „Keine
+  aktuellen Daten“; Ausfallzeiten fehlen in den Summen, sofern keine Zählerstände verfügbar sind.
 
 ## Installation auf dem Raspberry Pi
 

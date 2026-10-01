@@ -96,6 +96,11 @@ DEFAULT_SETTINGS = {
     "screen_rotation_seconds": "30",
     # Datenschutz: Werte des laufenden Tages erst ab so vielen Anreisen zeigen
     "privacy_min_trips_today": "3",
+    # PV-Anlage: IP-Adresse des Fronius-Wechselrichters, "demo" oder leer (aus)
+    "pv_source": "",
+    "pv_kwp": "",                          # Anlagenleistung (Module) in kWp, optional
+    "pv_co2_g_per_kwh": "344",             # UBA Strommix 2025 (erste Schätzung)
+    "pv_ev_kwh_per_100km": "18",           # Annahme Verbrauch E-Auto
 }
 
 # Name, Gesamtstrecke hin + zurück in km (einfache Strecke × 2)
