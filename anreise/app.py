@@ -172,7 +172,12 @@ def register_routes(app):
 
     @app.get("/api/dashboard/anreise")
     def api_overview():
-        data = db.overview(get_db(), today())
+        conn = get_db()
+        try:
+            min_trips = max(0, int(db.get_settings(conn).get("privacy_min_trips_today", "3")))
+        except ValueError:
+            min_trips = 3
+        data = db.overview(conn, today(), min_trips)
         y = data["year_total"]
         data["compare"] = {
             "distance": vergleiche.vergleich(y["km"], vergleiche.STRECKEN),
@@ -335,6 +340,9 @@ def register_routes(app):
             months = months[:-1]
         db.set_setting(conn, "meals_closed_months", ",".join(months))
         db.set_setting(conn, "screen_rotation_seconds", f"{int(parse_float(f.get('screen_rotation_seconds')))}")
+        if f.get("privacy_min_trips_today") is not None:
+            db.set_setting(conn, "privacy_min_trips_today",
+                           f"{int(parse_float(f.get('privacy_min_trips_today'), 3))}")
         conn.commit()
         return redirect(url_for("admin") + "#einstellungen")
 

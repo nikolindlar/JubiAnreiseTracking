@@ -20,7 +20,19 @@ def app(tmp_path):
         "TESTING": True,
     })
     app.state = state
+    # Bestehende Tests prüfen Einzelbuchungen; die Datenschutz-Schwelle wird
+    # in eigenen Tests geprüft
+    set_privacy(app, 0)
     return app
+
+
+def set_privacy(app, n):
+    from anreise import db
+    from anreise.app import get_db
+    with app.app_context():
+        conn = get_db()
+        db.set_setting(conn, "privacy_min_trips_today", str(n))
+        conn.commit()
 
 
 @pytest.fixture
@@ -404,3 +416,50 @@ def test_dashboard_urls_and_redirects(client):
     assert r.headers["Location"].endswith("/dashboard/anreise?empfang=")
     r = client.get("/ernaehrung?empfang=1")
     assert r.headers["Location"].endswith("/dashboard/verpflegung?empfang=1")
+
+
+def test_privacy_threshold_hides_today_everywhere(app, client):
+    set_privacy(app, 3)
+    kiosk_login(client)
+    bike, car = mode_id(app, "Fahrrad/E-Bike"), mode_id(app, "Auto (Verbrenner)")
+    app.state["today"] = date(2026, 9, 30)
+    client.post("/api/anreise", json={"employee_id": 2, "mode_id": car})   # Vortag
+    app.state["today"] = date(2026, 10, 1)
+    before = client.get("/api/dashboard/anreise").get_json()
+
+    for emp in (1, 3):  # zwei Anreisen heute: noch unter der Schwelle
+        client.post("/api/anreise", json={"employee_id": emp, "mode_id": bike})
+        d = client.get("/api/dashboard/anreise").get_json()
+        assert d["today"]["hidden"] is True and d["today"]["trips"] == 0
+        # Nichts darf sich gegenüber vorher verändern
+        for key in ("year_total", "by_mode", "human_km", "monthly", "records", "compare"):
+            assert d[key] == before[key], key
+
+    client.post("/api/anreise", json={"employee_id": 2, "mode_id": car})  # dritte Anreise
+    d = client.get("/api/dashboard/anreise").get_json()
+    assert d["today"]["hidden"] is False and d["today"]["trips"] == 3
+    assert d["year_total"]["trips"] == 4
+    assert d["human_km"] == pytest.approx(18 + 34)
+
+
+def test_privacy_threshold_reapplies_after_undo(app, client):
+    set_privacy(app, 3)
+    kiosk_login(client)
+    bus = mode_id(app, "Bus")
+    tokens = [client.post("/api/anreise", json={"employee_id": e, "mode_id": bus}).get_json()["undo_token"]
+              for e in (1, 2, 3)]
+    assert client.get("/api/dashboard/anreise").get_json()["today"]["hidden"] is False
+    client.post("/api/anreise/storno", json={"undo_token": tokens[-1]})
+    d = client.get("/api/dashboard/anreise").get_json()
+    assert d["today"]["hidden"] is True and d["year_total"]["trips"] == 0
+
+
+def test_privacy_default_and_setting(app, client):
+    from anreise import db
+    assert db.DEFAULT_SETTINGS["privacy_min_trips_today"] == "3"
+    csrf = admin_login(client)
+    client.post("/verwaltung/einstellungen", data={
+        "csrf": csrf, "meals_days_per_year": "20000", "meals_organic_share": "50",
+        "meals_veg_kg_per_day": "3.81", "meals_mixed_kg_per_day": "5.63", "closed_12": "on",
+        "screen_rotation_seconds": "30", "privacy_min_trips_today": "5"})
+    assert client.get("/api/dashboard/anreise").get_json()["min_trips_today"] == 5

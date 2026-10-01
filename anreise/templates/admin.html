@@ -68,7 +68,7 @@
     {% endfor %}
   </table>
 
-  <h2 id="einstellungen">Verpflegung &amp; Empfangsbildschirm</h2>
+  <h2 id="einstellungen">Verpflegung, Empfangsbildschirm &amp; Datenschutz</h2>
   <p class="hint">Pauschalwerte für das Verpflegungs-Dashboard. Die Übernachtungen werden gleichmäßig auf die
     Öffnungstage verteilt und laufen als Zähler mit.</p>
   <form method="post" action="{{ url_for('settings_update') }}" class="settings">
@@ -93,6 +93,10 @@
       <input name="screen_rotation_seconds" value="{{ settings.screen_rotation_seconds }}" inputmode="numeric" size="4"></label>
     <p class="hint">Der Wechsel zwischen den Dashboards ist nur aktiv, wenn der Bildschirm die Adresse mit
       <code>?empfang</code> aufruft, z. B. <code>http://&lt;pi&gt;:8080/?empfang</code>.</p>
+    <label>Tageswerte im Anreise-Dashboard erst ab … Anreisen anzeigen
+      <input name="privacy_min_trips_today" value="{{ settings.privacy_min_trips_today }}" inputmode="numeric" size="4"></label>
+    <p class="hint">Bis dahin fließen die Anreisen des Tages in keine Anzeige ein, auch nicht in die Jahreswerte.
+      So lässt sich nicht erkennen, wie die ersten Personen des Tages angereist sind. 0 = sofort anzeigen.</p>
     <button>Speichern</button>
   </form>
 </main>
