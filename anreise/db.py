@@ -7,6 +7,9 @@ gespeichert.
 """
 import sqlite3
 
+# Ab so vielen Anreisen an einem Tag zählt der Tag für Rekorde
+RECORD_MIN_TRIPS = 5
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS employees (
     id          INTEGER PRIMARY KEY,
@@ -23,7 +26,9 @@ CREATE TABLE IF NOT EXISTS modes (
     source     TEXT    NOT NULL DEFAULT '',
     sort       INTEGER NOT NULL DEFAULT 0,
     active     INTEGER NOT NULL DEFAULT 1,
-    is_baseline INTEGER NOT NULL DEFAULT 0   -- Vergleichswert "alle mit dem Auto"
+    is_baseline INTEGER NOT NULL DEFAULT 0,  -- Vergleichswert "alle mit dem Auto"
+    is_green    INTEGER NOT NULL DEFAULT 0,  -- zählt als klimafreundlich
+    is_human    INTEGER NOT NULL DEFAULT 0   -- mit Muskelkraft (zu Fuß, Rad)
 );
 
 -- Aggregierte Tageswerte. CO2 wird beim Buchen mit dem dann gültigen Faktor
@@ -63,6 +68,14 @@ DEFAULT_MODES = [
      " (Schätzung), 1 Person", 0),
 ]
 
+# Voreinstellung der Merkmale je Verkehrsmittel: (klimafreundlich, Muskelkraft)
+DEFAULT_FLAGS = {
+    "zu Fuß": (1, 1),
+    "Fahrrad/E-Bike": (1, 1),
+    "Bus": (1, 0),
+    "Bus + Bahn": (1, 0),
+}
+
 # Name, Gesamtstrecke hin + zurück in km (einfache Strecke × 2)
 DEFAULT_EMPLOYEES = [("Niko", 18), ("Angela", 74), ("Marlene", 34)]
 
@@ -76,6 +89,13 @@ def connect(path):
 
 def init_db(conn):
     conn.executescript(SCHEMA)
+    # Ältere Datenbanken um neue Spalten ergänzen
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(modes)")}
+    new_cols = [c for c in ("is_green", "is_human") if c not in cols]
+    for col in new_cols:
+        conn.execute(f"ALTER TABLE modes ADD COLUMN {col} INTEGER NOT NULL DEFAULT 0")
+    if new_cols:
+        apply_default_flags(conn)
     if conn.execute("SELECT COUNT(*) FROM modes").fetchone()[0] == 0:
         for sort, (label, icon, factor, source, baseline) in enumerate(DEFAULT_MODES):
             conn.execute(
@@ -83,10 +103,17 @@ def init_db(conn):
                 " VALUES (?, ?, ?, ?, ?, ?)",
                 (label, icon, factor, source, sort, baseline),
             )
+        apply_default_flags(conn)
     if conn.execute("SELECT COUNT(*) FROM employees").fetchone()[0] == 0:
         for name, km in DEFAULT_EMPLOYEES:
             conn.execute("INSERT INTO employees (name, distance_km) VALUES (?, ?)", (name, km))
     conn.commit()
+
+
+def apply_default_flags(conn):
+    for label, (green, human) in DEFAULT_FLAGS.items():
+        conn.execute("UPDATE modes SET is_green = ?, is_human = ? WHERE label = ?",
+                     (green, human, label))
 
 
 def baseline_factor(conn):
@@ -155,3 +182,69 @@ def daily_rows(conn):
            FROM daily_totals d JOIN modes m ON m.id = d.mode_id
            ORDER BY d.day, m.sort"""
     ).fetchall()
+
+
+def overview(conn, today):
+    """Alle Kennzahlen für die Übersicht (heute und laufendes Jahr)."""
+    day = today.isoformat()
+    year_start = today.replace(month=1, day=1).isoformat()
+
+    def enrich(t):
+        t["avg_g_per_km"] = t["co2_g"] / t["km"] if t["km"] else None
+        t["saved_g"] = t["baseline_g"] - t["co2_g"]
+        return t
+
+    today_t = enrich(totals(conn, day, day))
+    year_t = enrich(totals(conn, year_start, day))
+
+    by_mode = [dict(r) for r in conn.execute(
+        """SELECT m.label, m.icon, m.is_green, m.is_human,
+                  COALESCE(SUM(d.trips), 0) AS trips, COALESCE(SUM(d.km), 0) AS km
+           FROM modes m LEFT JOIN daily_totals d
+             ON d.mode_id = m.id AND d.day BETWEEN ? AND ?
+           GROUP BY m.id
+           HAVING m.active = 1 OR trips > 0
+           ORDER BY m.sort""", (year_start, day))]
+    year_trips = sum(m["trips"] for m in by_mode)
+    green_trips = sum(m["trips"] for m in by_mode if m["is_green"])
+    year_t["green_share"] = green_trips / year_trips if year_trips else None
+    human_km = sum(m["km"] for m in by_mode if m["is_human"])
+
+    staff = conn.execute(
+        "SELECT COUNT(*) FROM employees WHERE active = 1 AND distance_km > 0").fetchone()[0]
+
+    return {
+        "date": day,
+        "year": today.year,
+        "today": today_t,
+        "year_total": year_t,
+        "staff": staff,
+        "by_mode": by_mode,
+        "human_km": human_km,
+        "records": records(conn, year_start, day),
+        "baseline_factor_g": baseline_factor(conn),
+    }
+
+
+def records(conn, day_from, day_to, min_trips=RECORD_MIN_TRIPS, threshold=0.5):
+    """Bester Tag (Anteil klimafreundlich) und längste Serie aufeinanderfolgender
+    erfasster Tage mit mindestens `threshold` klimafreundlich. Gezählt werden nur
+    Tage mit mindestens `min_trips` Anreisen; Tage ohne genug Daten (z. B.
+    Wochenenden) unterbrechen die Serie nicht."""
+    days = conn.execute(
+        """SELECT d.day, SUM(d.trips) AS trips,
+                  SUM(CASE WHEN m.is_green = 1 THEN d.trips ELSE 0 END) AS green
+           FROM daily_totals d JOIN modes m ON m.id = d.mode_id
+           WHERE d.day BETWEEN ? AND ?
+           GROUP BY d.day HAVING SUM(d.trips) >= ?
+           ORDER BY d.day""", (day_from, day_to, min_trips)).fetchall()
+    best = None
+    streak = longest = 0
+    for r in days:
+        share = r["green"] / r["trips"]
+        if best is None or share > best["share"]:
+            best = {"day": r["day"], "share": share}
+        streak = streak + 1 if share >= threshold else 0
+        longest = max(longest, streak)
+    return {"best_day": best, "longest_streak": longest,
+            "min_trips": min_trips, "days_counted": len(days)}

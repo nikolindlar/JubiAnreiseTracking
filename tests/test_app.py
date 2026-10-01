@@ -249,3 +249,76 @@ def test_undo_requires_login_and_valid_token(app, client):
     assert client.post("/api/anreise/storno", json={"undo_token": "falsch"}).status_code == 410
     assert client.post("/api/anreise/storno", json={}).status_code == 410
     assert client.get("/api/uebersicht").get_json()["today"]["trips"] == 1
+
+
+def test_comparisons():
+    from anreise.vergleiche import vergleich, STRECKEN, FLUEGE
+    assert vergleich(0, STRECKEN) is None
+    c = vergleich(57, STRECKEN)
+    assert c["label"] == "München–Jubi" and c["factor"] == pytest.approx(0.5)
+    c = vergleich(112236, STRECKEN)
+    assert c["label"] == "um die Erde" and c["factor"] == pytest.approx(2.8, abs=0.01)
+    c = vergleich(1216 * 210 * 2, FLUEGE)
+    assert c["label"] == "München–Mallorca" and c["factor"] == pytest.approx(2)
+
+
+def test_overview_stats(app, client):
+    from datetime import timedelta
+    kiosk_login(client)
+    ids = {l: mode_id(app, l) for l in ["Fahrrad/E-Bike", "Bus", "Auto (Verbrenner)"]}
+    # 4 weitere Mitarbeitende, damit 5 Anreisen pro Tag möglich sind
+    csrf = admin_login(client)
+    for i in range(4):
+        client.post("/verwaltung/mitarbeitende", data={"csrf": csrf, "name": f"P{i}", "distance_km": "10"})
+
+    def day(d, green):  # 5 Anreisen, davon `green` klimafreundlich
+        app.state["today"] = d
+        for emp in range(1, 6):
+            mode = ids["Fahrrad/E-Bike"] if emp <= green else ids["Auto (Verbrenner)"]
+            client.post("/api/anreise", json={"employee_id": emp, "mode_id": mode})
+
+    start = date(2026, 3, 2)
+    day(start, 3)                        # 60 %
+    day(start + timedelta(days=1), 4)    # 80 % -> bester Tag
+    day(start + timedelta(days=2), 1)    # 20 % -> Serie bricht
+    day(start + timedelta(days=7), 3)
+    day(start + timedelta(days=8), 3)
+    day(start + timedelta(days=9), 5)    # 100 % -> neuer bester Tag, Serie 3
+    app.state["today"] = start + timedelta(days=10)
+    client.post("/api/anreise", json={"employee_id": 1, "mode_id": ids["Bus"]})  # nur 1 Anreise: zählt nicht
+
+    d = client.get("/api/uebersicht").get_json()
+    r = d["records"]
+    assert r["best_day"] == {"day": "2026-03-11", "share": 1.0}
+    assert r["longest_streak"] == 3
+    assert r["days_counted"] == 6
+    assert d["staff"] == 7
+    assert d["today"]["trips"] == 1
+    y = d["year_total"]
+    assert y["trips"] == 31
+    assert y["green_share"] == pytest.approx(20 / 31)
+    # Rad-km: Strecken 18, 74, 34, 10, 10; je Tag die ersten `green` Personen
+    assert d["human_km"] == pytest.approx(126 + 136 + 18 + 126 + 126 + 146)
+    assert y["avg_g_per_km"] == pytest.approx(y["co2_g"] / y["km"])
+    assert d["compare"]["distance"]["label"]
+    modes = {m["label"]: m for m in d["by_mode"]}
+    assert modes["Bus"]["trips"] == 1 and modes["Bus"]["is_green"] == 1 and modes["Bus"]["is_human"] == 0
+
+
+def test_migration_adds_mode_flags(tmp_path):
+    import sqlite3
+    path = tmp_path / "alt.sqlite3"
+    conn = sqlite3.connect(path)
+    conn.executescript("""
+        CREATE TABLE modes (id INTEGER PRIMARY KEY, label TEXT NOT NULL, icon TEXT NOT NULL DEFAULT '',
+            factor_g REAL NOT NULL, source TEXT NOT NULL DEFAULT '', sort INTEGER NOT NULL DEFAULT 0,
+            active INTEGER NOT NULL DEFAULT 1, is_baseline INTEGER NOT NULL DEFAULT 0);
+        INSERT INTO modes (label, factor_g) VALUES ('Fahrrad/E-Bike', 0), ('Bus', 90), ('E-Auto', 98);
+    """)
+    conn.close()
+    app = create_app({"DATABASE": str(path), "SECRET_KEY": "x"})
+    from anreise.app import get_db
+    with app.app_context():
+        rows = {r["label"]: (r["is_green"], r["is_human"])
+                for r in get_db().execute("SELECT label, is_green, is_human FROM modes")}
+    assert rows == {"Fahrrad/E-Bike": (1, 1), "Bus": (1, 0), "E-Auto": (0, 0)}

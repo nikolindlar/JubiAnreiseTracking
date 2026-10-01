@@ -11,7 +11,7 @@ from functools import wraps
 from flask import (Flask, Response, abort, g, jsonify, redirect, render_template,
                    request, session, url_for)
 
-from . import db
+from . import db, vergleiche
 
 
 def create_app(config=None):
@@ -136,15 +136,14 @@ def register_routes(app):
 
     @app.get("/api/uebersicht")
     def api_overview():
-        conn = get_db()
-        t = today()
-        year_start = t.replace(month=1, day=1).isoformat()
-        return jsonify(
-            date=t.isoformat(),
-            year=t.year,
-            today=db.totals(conn, t.isoformat(), t.isoformat()),
-            year_total=db.totals(conn, year_start, t.isoformat()),
-        )
+        data = db.overview(get_db(), today())
+        y = data["year_total"]
+        data["compare"] = {
+            "distance": vergleiche.vergleich(y["km"], vergleiche.STRECKEN),
+            "human": vergleiche.vergleich(data["human_km"], vergleiche.MUSKELKRAFT),
+            "flights": vergleiche.vergleich(y["saved_g"], vergleiche.FLUEGE),
+        }
+        return jsonify(data)
 
     # ---------- Erfassung (Tablets) ----------
     @app.route("/erfassung/login", methods=["GET", "POST"])
@@ -270,12 +269,14 @@ def register_routes(app):
         label = request.form.get("label", "").strip()
         if label:
             conn.execute(
-                "UPDATE modes SET label = ?, icon = ?, factor_g = ?, source = ?, active = ?"
-                " WHERE id = ?",
+                "UPDATE modes SET label = ?, icon = ?, factor_g = ?, source = ?, active = ?,"
+                " is_green = ?, is_human = ? WHERE id = ?",
                 (label, request.form.get("icon", "").strip(),
                  parse_float(request.form.get("factor_g")),
                  request.form.get("source", "").strip(),
-                 1 if request.form.get("active") else 0, mode_id))
+                 1 if request.form.get("active") else 0,
+                 1 if request.form.get("is_green") else 0,
+                 1 if request.form.get("is_human") else 0, mode_id))
             if request.form.get("is_baseline"):
                 conn.execute("UPDATE modes SET is_baseline = (id = ?)", (mode_id,))
             conn.commit()

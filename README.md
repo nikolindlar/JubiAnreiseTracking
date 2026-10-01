@@ -6,7 +6,7 @@ den CO₂-Ausstoß pro Tag und Jahr im Empfangsbereich an.
 | Seite | Adresse | Zweck |
 |---|---|---|
 | Erfassung | `http://<pi>:8080/erfassung` | Tablets an den Eingängen: Name → Verkehrsmittel (Passwort, einmalig pro Tablet) |
-| Übersicht | `http://<pi>:8080/` | Empfang: Balken „tatsächlich“ vs. „alle mit dem Auto“, heute und laufendes Jahr |
+| Übersicht | `http://<pi>:8080/` | Empfang: CO₂ tatsächlich vs. „alle mit dem Auto“, Ø g CO₂/km, Beteiligung, Verkehrsmittel-Anteile, Strecke mit Vergleichen, Flug-Vergleich, Rekorde |
 | Verwaltung | `http://<pi>:8080/verwaltung` | Mitarbeitende, Strecken, Verkehrsmittel, Emissionsfaktoren, CSV-Export (Passwort) |
 
 ## Datenschutz – was gespeichert wird
@@ -57,6 +57,23 @@ g CO₂-Äquivalente pro Personenkilometer inkl. Energievorkette.
 Hinweis: Der UBA-Pkw-Wert (164 g/Pkm) unterstellt 1,4 Personen pro Auto. Da Pendler
 meist allein fahren, wird er auf eine Person umgerechnet (164 × 1,4 ≈ 230 g/Pkm).
 Das E-Auto wird genauso umgerechnet (70 × 1,4 ≈ 98 g/Pkm). Der Verbrenner-Wert gilt auch für den Vergleichsbalken „alle mit dem Auto“.
+
+## Kennzahlen der Übersicht
+
+- **Heute / Jahr:** eingespartes CO₂, Balken tatsächlich vs. alle mit dem Auto, Ø g CO₂ pro km,
+  heute die Beteiligung („erfasst X von Y“), im Jahr der Anteil klimafreundlicher Anreisen.
+- **Verkehrsmittel:** Anteil an allen Anreisen des Jahres. Bewusst nur fürs Jahr, nicht pro Tag,
+  damit sich einzelne Personen nicht erkennen lassen.
+- **Gefahrene Strecke / Mit Muskelkraft:** Jahres-km mit anschaulichem Vergleich (Luftlinie).
+  Die Vergleichslisten stehen in `anreise/vergleiche.py`.
+- **Eingespartes CO₂ als Flüge** ab München, einfache Strecke, pro Person. Näherung:
+  Entfernung × 290 g/km (UBA Inlandsflug 2024) bzw. × 210 g/km (abgeleitet aus dem
+  UBA-Beispiel Frankfurt–New York).
+- **Rekorde:** bester Tag nach Anteil klimafreundlich und längste Serie von Tagen mit
+  mindestens 50 % klimafreundlich. Gezählt werden nur Tage mit mindestens 5 Anreisen;
+  Tage ohne genug Daten (Wochenende) unterbrechen die Serie nicht.
+- Welche Verkehrsmittel als „klimafreundlich“ bzw. „Muskelkraft“ zählen, ist in der Verwaltung
+  einstellbar (Standard: zu Fuß, Rad, Bus, Bus + Bahn bzw. zu Fuß, Rad).
 
 ## Installation auf dem Raspberry Pi
 
