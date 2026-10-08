@@ -15,6 +15,22 @@
     </nav>
   </header>
 
+  <h2 id="hinweis">Hinweis auf dem Tablet</h2>
+  <p class="hint">Erscheint auf der Erfassungsseite unter den Namen, z. B. eine Ankündigung oder ein Hinweis auf eine Baustelle.
+    Höchstens {{ notice_max }} Zeichen (etwa 2–3 Sätze). Die Tablets übernehmen Änderungen spätestens nach 15 Minuten.</p>
+  <form method="post" action="{{ url_for('notice_update') }}" class="settings">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <textarea name="kiosk_notice" rows="3" maxlength="{{ notice_max }}" placeholder="z. B. Am 12. Dezember ab 17 Uhr ist Weihnachtsfeier im Speisesaal. Bitte bis Freitag anmelden!">{{ settings.kiosk_notice }}</textarea>
+    <label>Anzeigen bis einschließlich (optional)
+      <input type="date" name="kiosk_notice_until" value="{{ settings.kiosk_notice_until }}"></label>
+    <p class="hint">Status:
+      {% if notice_active %}<strong>wird angezeigt</strong>{% if settings.kiosk_notice_until %} bis einschließlich {{ settings.kiosk_notice_until.split('-')|reverse|join('.') }}{% endif %}
+      {% elif settings.kiosk_notice %}<span class="warn">abgelaufen, wird nicht mehr angezeigt</span>
+      {% else %}kein Hinweis{% endif %}</p>
+    <button name="action" value="save">Speichern</button>
+    <button name="action" value="delete" class="danger">Hinweis entfernen</button>
+  </form>
+
   <h2>Mitarbeitende</h2>
   <p class="hint">Strecke = Gesamtstrecke Hin- und Rückweg in km. Nur aktive Personen mit Strecke &gt; 0 erscheinen auf dem Tablet.</p>
   <table>

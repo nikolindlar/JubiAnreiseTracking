@@ -161,6 +161,13 @@ Namensauswahl (für die nächste Person). Auf der Verkehrsmittel-Seite geht es n
 20 s ohne Eingabe ebenfalls zurück zur Namensauswahl. Die Seite und lädt sich alle 15 Minuten neu, damit Änderungen aus der
 Verwaltung ankommen.
 
+## Hinweis auf dem Tablet
+
+In der Verwaltung ganz oben („Hinweis auf dem Tablet“) lässt sich ein kurzer Text (max. 400 Zeichen)
+eingeben, der auf der Erfassungsseite unter den Namen erscheint, z. B. eine Ankündigung oder ein
+Hinweis auf eine Baustelle. Optional mit Enddatum, danach wird er automatisch ausgeblendet. Die
+Tablets laden die Seite alle 15 Minuten neu und übernehmen Änderungen spätestens dann.
+
 ## Erste Schritte nach der Installation
 
 1. `http://<pi-ip>:8080/verwaltung` öffnen und anmelden.

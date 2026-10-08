@@ -45,6 +45,29 @@ button { font: inherit; cursor: pointer; }
 /* ---------- Erfassung (Tablet) ---------- */
 .kiosk { user-select: none; -webkit-user-select: none; touch-action: manipulation; }
 .kiosk h1 { font-size: clamp(1.6rem, 4vw, 2.6rem); text-align: center; }
+.kiosk main { padding-top: 16px; padding-bottom: 16px; }
+.kiosk h1 { margin-bottom: 16px; }
+/* Namensauswahl füllt den Bildschirm: Kacheln oben, Blättern und Hinweis unten */
+#step-name { display: flex; flex-direction: column; height: calc(100vh - 32px); height: calc(100dvh - 32px); }
+.name-area { flex: 1; min-height: 0; overflow: hidden; }
+.tiles.names .tile { min-height: 96px; }
+@media (max-height: 720px) {
+  .kiosk h1 { font-size: 1.6rem; margin-bottom: 12px; }
+  .tiles.names { gap: 12px; }
+  .tiles.names .tile { min-height: 76px; padding: 8px; }
+  .pager { margin-top: 8px; }
+  .pager-arrow, .page-tab { height: 56px; }
+  .notice { margin-top: 10px; padding: 12px 18px; }
+  .notice p { font-size: 1.1rem; }
+}
+.pager { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 12px; }
+.pager-arrow { width: 72px; height: 64px; border: 2px solid var(--line); border-radius: 14px; background: var(--card);
+  color: var(--fg); font-size: 2.2rem; line-height: 1; }
+.page-tabs { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.page-tab { min-width: 88px; height: 64px; padding: 0 16px; border: 2px solid var(--line); border-radius: 14px;
+  background: var(--card); color: var(--fg); font-size: 1.3rem; font-weight: 700; }
+.page-tab.active { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.pager-arrow:active, .page-tab:active { border-color: var(--accent); }
 .tiles {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
@@ -91,6 +114,10 @@ button { font: inherit; cursor: pointer; }
 .undo:active { background: var(--danger); color: #fff; border-color: var(--danger); }
 .finish { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
 .hint { color: var(--muted); }
+.notice { display: flex; gap: 16px; align-items: flex-start; margin-top: 16px; flex-shrink: 0; padding: 20px 24px;
+  background: var(--card); border: 2px solid var(--accent); border-radius: 16px; }
+.notice p { margin: 0; font-size: clamp(1.15rem, 2vw, 1.5rem); line-height: 1.45; white-space: pre-line; }
+.notice-icon { font-size: 2rem; line-height: 1; }
 
 /* ---------- Dashboards (Empfang) ---------- */
 .dashboard main { max-width: 1800px; padding-top: 14px; padding-bottom: 12px; }
@@ -230,6 +257,8 @@ button { font: inherit; cursor: pointer; }
 .error { color: var(--danger); }
 .admin form label { display: block; margin-bottom: 12px; }
 .admin form.settings { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; max-width: 640px; }
+.admin textarea { width: 100%; font: inherit; padding: 8px; background: var(--bg); color: var(--fg);
+  border: 1px solid var(--line); border-radius: 6px; margin-bottom: 12px; resize: vertical; }
 .admin form.settings label.inline { display: inline-block; margin: 0 12px 6px 0; }
 .admin fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 0 0 12px; padding: 8px 12px; }
 .admin code { background: var(--bg); padding: 1px 4px; border-radius: 4px; }

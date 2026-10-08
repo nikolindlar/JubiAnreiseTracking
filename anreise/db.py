@@ -96,6 +96,9 @@ DEFAULT_SETTINGS = {
     "screen_rotation_seconds": "30",
     # Datenschutz: Werte des laufenden Tages erst ab so vielen Anreisen zeigen
     "privacy_min_trips_today": "3",
+    # Hinweistext auf dem Tablet unter den Namen (leer = keiner), optional bis Datum
+    "kiosk_notice": "",
+    "kiosk_notice_until": "",              # YYYY-MM-DD, leer = unbegrenzt
     # PV-Anlage: IP-Adresse des Fronius-Wechselrichters, "demo" oder leer (aus)
     "pv_source": "",
     "pv_kwp": "",                          # Anlagenleistung (Module) in kWp, optional
@@ -365,3 +368,15 @@ def nutrition(settings, today):
         "mixed_kg_per_day": mixed,
         "organic_share": float(settings["meals_organic_share"]),
     }
+
+
+NOTICE_MAX_CHARS = 400
+
+
+def kiosk_notice(settings, today):
+    """Aktueller Hinweistext für das Tablet oder None (leer bzw. abgelaufen)."""
+    text = (settings.get("kiosk_notice") or "").strip()
+    until = (settings.get("kiosk_notice_until") or "").strip()
+    if not text or (until and until < today.isoformat()):
+        return None
+    return text

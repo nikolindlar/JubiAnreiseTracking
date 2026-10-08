@@ -464,3 +464,58 @@ def test_privacy_default_and_setting(app, client):
         "meals_veg_kg_per_day": "3.81", "meals_mixed_kg_per_day": "5.63", "closed_12": "on",
         "screen_rotation_seconds": "30", "privacy_min_trips_today": "5"})
     assert client.get("/api/dashboard/anreise").get_json()["min_trips_today"] == 5
+
+
+def test_kiosk_notice(app, client):
+    csrf = admin_login(client)
+    kiosk_login(client)
+    assert 'class="notice"' not in client.get("/erfassung").get_data(as_text=True)
+    text = "Am 12. Dezember ist Weihnachtsfeier.\r\nBitte <b>anmelden</b>!"
+    client.post("/verwaltung/hinweis", data={"csrf": csrf, "kiosk_notice": text,
+                                            "kiosk_notice_until": "2026-12-12", "action": "save"})
+    page = client.get("/erfassung").get_data(as_text=True)
+    assert 'class="notice"' in page
+    assert "Weihnachtsfeier.\nBitte &lt;b&gt;anmelden&lt;/b&gt;!" in page   # escaped, Zeilenumbruch bleibt
+    assert "wird angezeigt" in client.get("/verwaltung").get_data(as_text=True)
+    # nach Ablauf ausgeblendet
+    app.state["today"] = date(2026, 12, 13)
+    assert 'class="notice"' not in client.get("/erfassung").get_data(as_text=True)
+    assert "abgelaufen" in client.get("/verwaltung").get_data(as_text=True)
+    # entfernen
+    client.post("/verwaltung/hinweis", data={"csrf": csrf, "kiosk_notice": "x", "action": "delete"})
+    from anreise import db
+    from anreise.app import get_db
+    with app.app_context():
+        s = db.get_settings(get_db())
+    assert s["kiosk_notice"] == "" and s["kiosk_notice_until"] == ""
+
+
+def test_kiosk_notice_limits(app, client):
+    csrf = admin_login(client)
+    client.post("/verwaltung/hinweis", data={"csrf": csrf, "kiosk_notice": "a" * 1000,
+                                            "kiosk_notice_until": "kein-datum", "action": "save"})
+    from anreise import db
+    from anreise.app import get_db
+    with app.app_context():
+        s = db.get_settings(get_db())
+    assert len(s["kiosk_notice"]) == db.NOTICE_MAX_CHARS and s["kiosk_notice_until"] == ""
+    # nur mit Anmeldung
+    other = app.test_client()
+    assert other.post("/verwaltung/hinweis", data={"kiosk_notice": "x"}).status_code == 302
+
+
+def test_kiosk_has_pager_and_notice_outside_name_area(app, client):
+    from anreise import db
+    from anreise.app import get_db
+    with app.app_context():
+        conn = get_db()
+        for i in range(30):
+            conn.execute("INSERT INTO employees (name, distance_km) VALUES (?, 10)", (f"Person {i:02d}",))
+        db.set_setting(conn, "kiosk_notice", "Hinweis")
+        conn.commit()
+    kiosk_login(client)
+    page = client.get("/erfassung").get_data(as_text=True)
+    assert page.count('class="tile" data-id=') == 33
+    assert 'id="pager"' in page and 'id="page-tabs"' in page
+    # Hinweis liegt außerhalb des Kachelbereichs und bleibt beim Blättern sichtbar
+    assert page.index('id="name-area"') < page.index('id="pager"') < page.index('class="notice"')
