@@ -6,13 +6,20 @@
 <main>
   <section id="step-name">
     <h1>Guten Morgen! Wer bist du?</h1>
-    <div class="tiles">
-      {% for e in employees %}
-      <button class="tile" data-id="{{ e.id }}">{{ e.name }}</button>
-      {% else %}
-      <p class="hint">Noch keine Mitarbeitenden mit hinterlegter Strecke. Bitte in der Verwaltung pflegen.</p>
-      {% endfor %}
+    <div class="name-area" id="name-area">
+      <div class="tiles names" id="name-tiles">
+        {% for e in employees %}
+        <button class="tile" data-id="{{ e.id }}">{{ e.name }}</button>
+        {% else %}
+        <p class="hint">Noch keine Mitarbeitenden mit hinterlegter Strecke. Bitte in der Verwaltung pflegen.</p>
+        {% endfor %}
+      </div>
     </div>
+    <nav class="pager" id="pager" hidden aria-label="Seiten der Namensliste">
+      <button class="pager-arrow" id="page-prev" aria-label="Vorherige Seite">‹</button>
+      <div class="page-tabs" id="page-tabs"></div>
+      <button class="pager-arrow" id="page-next" aria-label="Nächste Seite">›</button>
+    </nav>
     {% if notice %}
     <aside class="notice" role="note"><span class="notice-icon" aria-hidden="true">📣</span><p>{{ notice }}</p></aside>
     {% endif %}
@@ -60,7 +67,81 @@
     employeeId = null; undoToken = null; busy = false;
     undoBtn.hidden = true;
     show('name');
+    goToPage(0);
   }
+
+  // ---- Namensliste in Seiten aufteilen, so viele Kacheln wie auf den Bildschirm passen
+  var area = document.getElementById('name-area');
+  var grid = document.getElementById('name-tiles');
+  var nameTiles = Array.prototype.slice.call(grid.querySelectorAll('.tile'));
+  var pager = document.getElementById('pager');
+  var tabs = document.getElementById('page-tabs');
+  var page = 0, pageSize = nameTiles.length || 1, pageTimer = null;
+
+  function pageCount() { return Math.max(1, Math.ceil(nameTiles.length / pageSize)); }
+
+  function layoutPages() {
+    if (!nameTiles.length || steps.name.hidden) return;
+    nameTiles.forEach(function (t) { t.hidden = false; });
+    var style = getComputedStyle(grid);
+    var cols = style.gridTemplateColumns.split(' ').filter(Boolean).length || 1;
+    var gap = parseFloat(style.rowGap) || 16;
+    var tileH = nameTiles[0].offsetHeight;
+    var rows = Math.max(1, Math.floor((area.clientHeight + gap) / (tileH + gap)));
+    pageSize = cols * rows;
+    // Seiten gleichmäßig füllen statt einer fast leeren letzten Seite
+    var pages = Math.ceil(nameTiles.length / pageSize);
+    pageSize = Math.ceil(nameTiles.length / pages);
+    pager.hidden = pages < 2;
+    tabs.innerHTML = '';
+    // Reiter mit Buchstabenbereich, z. B. „A–F“; an Seitengrenzen mit gleichem
+    // Anfangsbuchstaben so viele Buchstaben, bis sie unterscheidbar sind („A–Mar“, „Mia–Z“)
+    var name = function (i) { return nameTiles[i].textContent.trim(); };
+    var cut = function (a, b) {
+      var k = 1;
+      while (k < 4 && a.slice(0, k).toLowerCase() === b.slice(0, k).toLowerCase()) k++;
+      return k;
+    };
+    for (var p = 0; p < pages; p++) {
+      var i0 = p * pageSize, i1 = Math.min(nameTiles.length, (p + 1) * pageSize) - 1;
+      var kStart = p > 0 ? cut(name(i0 - 1), name(i0)) : 1;
+      var kEnd = i1 < nameTiles.length - 1 ? cut(name(i1), name(i1 + 1)) : 1;
+      var a = name(i0).slice(0, kStart), b = name(i1).slice(0, kEnd);
+      a = a.charAt(0).toUpperCase() + a.slice(1);
+      b = b.charAt(0).toUpperCase() + b.slice(1);
+      var tab = document.createElement('button');
+      tab.className = 'page-tab';
+      tab.textContent = a === b ? a : a + '–' + b;
+      tab.setAttribute('aria-label', 'Seite ' + (p + 1) + ' von ' + pages + ': Namen ' + tab.textContent);
+      tab.dataset.page = p;
+      tab.addEventListener('click', function () { goToPage(+this.dataset.page); });
+      tabs.appendChild(tab);
+    }
+    goToPage(Math.min(page, pages - 1), true);
+  }
+
+  function goToPage(p, keepTimer) {
+    var pages = pageCount();
+    page = (p + pages) % pages;
+    nameTiles.forEach(function (t, i) { t.hidden = Math.floor(i / pageSize) !== page; });
+    tabs.querySelectorAll('.page-tab').forEach(function (t, i) { t.classList.toggle('active', i === page); });
+    // Nach 30 s ohne Eingabe zurück auf die erste Seite
+    clearTimeout(pageTimer);
+    if (page > 0 && !keepTimer) pageTimer = setTimeout(function () { goToPage(0); }, 30000);
+  }
+
+  document.getElementById('page-prev').addEventListener('click', function () { goToPage(page - 1); });
+  document.getElementById('page-next').addEventListener('click', function () { goToPage(page + 1); });
+  // Wischen zum Blättern
+  var touchX = null;
+  area.addEventListener('touchstart', function (e) { touchX = e.touches[0].clientX; }, { passive: true });
+  area.addEventListener('touchend', function (e) {
+    if (touchX === null || pager.hidden) return;
+    var dx = e.changedTouches[0].clientX - touchX;
+    touchX = null;
+    if (Math.abs(dx) > 60) goToPage(page + (dx < 0 ? 1 : -1));
+  });
+  window.addEventListener('resize', layoutPages);
   function message(text, isError, delay) {
     doneText.textContent = text;
     steps.done.classList.toggle('error', !!isError);
@@ -129,6 +210,9 @@
       else message('Stornieren nicht mehr möglich.', true, 4000);
     });
   });
+
+  layoutPages();
+  window.addEventListener('load', layoutPages);   // nach dem Laden der Schriften neu messen
 
   // Seite gelegentlich neu laden, damit Änderungen aus der Verwaltung ankommen
   setInterval(function () { if (!steps.name.hidden) location.reload(); }, 15 * 60 * 1000);

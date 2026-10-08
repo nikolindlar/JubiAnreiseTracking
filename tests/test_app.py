@@ -502,3 +502,20 @@ def test_kiosk_notice_limits(app, client):
     # nur mit Anmeldung
     other = app.test_client()
     assert other.post("/verwaltung/hinweis", data={"kiosk_notice": "x"}).status_code == 302
+
+
+def test_kiosk_has_pager_and_notice_outside_name_area(app, client):
+    from anreise import db
+    from anreise.app import get_db
+    with app.app_context():
+        conn = get_db()
+        for i in range(30):
+            conn.execute("INSERT INTO employees (name, distance_km) VALUES (?, 10)", (f"Person {i:02d}",))
+        db.set_setting(conn, "kiosk_notice", "Hinweis")
+        conn.commit()
+    kiosk_login(client)
+    page = client.get("/erfassung").get_data(as_text=True)
+    assert page.count('class="tile" data-id=') == 33
+    assert 'id="pager"' in page and 'id="page-tabs"' in page
+    # Hinweis liegt außerhalb des Kachelbereichs und bleibt beim Blättern sichtbar
+    assert page.index('id="name-area"') < page.index('id="pager"') < page.index('class="notice"')
