@@ -11,7 +11,7 @@
   <div class="nutri-grid">
     <section class="panel" id="n-main">
       <h2><span class="year"></span> bis heute · 100 % vegetarisch</h2>
-      <p class="hero"><span class="hero-value" id="n-days"></span> <span class="hero-label">Verpflegungstage</span></p>
+      <p class="hero"><span class="hero-value" id="n-count"></span> <span class="hero-label">Mahlzeiten</span></p>
       <p class="facts" id="n-meals"></p>
       <div class="bars" id="n-bars"></div>
       <p class="saved" id="n-saved"></p>
@@ -31,16 +31,17 @@
           Schutz von Boden und Wasser.</p>
       </section>
       <section class="panel dash-tile" id="n-year">
-        <h2>Planwert ganzes Jahr <span class="year"></span></h2>
+        <h2>Hochrechnung <span class="year"></span></h2>
         <p class="tile-value"></p>
         <p class="tile-text"></p>
       </section>
     </div>
   </div>
 
-  <p class="footnote">Pauschalwerte: Übernachtungen mit Vollpension pro Jahr, gleichmäßig auf die Öffnungstage verteilt.
-    Emissionen pro Verpflegungstag (2.000 kcal): vegetarisch <span id="f-veg"></span> kg, Mischkost mit mittlerem
-    Fleischkonsum <span id="f-mixed"></span> kg CO₂e (Scarborough u. a. 2014, Climatic Change).
+  <p class="footnote"><span id="f-source"></span>
+    Pro Verpflegungstag (2.000 kcal): vegetarisch <span id="f-veg"></span> kg, Mischkost mit mittlerem
+    Fleischkonsum <span id="f-mixed"></span> kg CO₂e (Scarborough u. a. 2014), Anteile Frühstück
+    <span id="f-wb"></span> / Mittag oder Lunchpaket <span id="f-wl"></span> / Abend <span id="f-wd"></span> % (Annahme).
     Flüge: einfache Strecke ab München, Näherung über Entfernung × 290 g/km (Inland) bzw. 210 g/km (Ausland).</p>
 </main>
 
@@ -71,11 +72,17 @@
       { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
     document.querySelectorAll('.year').forEach(function (el) { el.textContent = d.year; });
 
-    document.getElementById('n-days').textContent = nf0.format(d.days_to_date);
-    document.getElementById('n-meals').innerHTML = '≈ <strong>' + nf0.format(d.days_to_date * 3) +
-      ' Mahlzeiten</strong> · ' + (d.open_today
-        ? 'heute rund <strong>' + nf0.format(d.days_per_open_day) + ' Gäste</strong> verpflegt'
-        : 'heute geschlossen');
+    document.getElementById('n-count').textContent = nf0.format(d.meal_count_to_date);
+    var t = d.today, today;
+    if (!t) today = 'heute keine Gäste';
+    else if (t.estimated) today = 'heute rund <strong>' + nf0.format(t.breakfast) + ' Gäste</strong> (geschätzt)';
+    else {
+      var parts = [];
+      [['breakfast', 'Frühstück'], ['packs', 'Lunchpakete'], ['lunch', 'Mittagessen'], ['dinner', 'Abendessen']]
+        .forEach(function (p) { if (t[p[0]]) parts.push('<strong>' + nf0.format(t[p[0]]) + '</strong> ' + p[1]); });
+      today = 'heute ' + parts.join(' · ');
+    }
+    document.getElementById('n-meals').innerHTML = today;
     var max = Math.max(d.veg_kg, d.mixed_kg, 1);
     document.getElementById('n-bars').innerHTML =
       bar('actual', 'Vegetarisch', d.veg_kg, max) + bar('baseline', 'Mit Fleisch', d.mixed_kg, max);
@@ -99,10 +106,19 @@
     org.querySelector('.tile-value').textContent = nf0.format(d.organic_share) + ' %';
 
     var yr = document.getElementById('n-year');
-    yr.querySelector('.tile-value').textContent = nf0.format(d.days_per_year);
-    yr.querySelector('.tile-text').innerHTML = 'Verpflegungstage · rund <strong>' + mass(d.year_saved_kg) +
+    yr.querySelector('.tile-value').textContent = nf0.format(d.year_meal_count);
+    yr.querySelector('.tile-text').innerHTML = 'Mahlzeiten · rund <strong>' + mass(d.year_saved_kg) +
       ' CO₂ weniger</strong> als mit Fleisch';
 
+    var months = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+    var planned = d.plan_months.map(function (m) { return months[m - 1]; }).join(', ');
+    document.getElementById('f-source').textContent = !planned
+      ? 'Pauschalwerte: Übernachtungen mit Vollpension pro Jahr, gleichmäßig auf die Öffnungstage verteilt.'
+      : 'Tagesgenau nach Essensplan (' + planned + ')' +
+        (d.plan_months.length < 12 ? ', übrige Monate geschätzt.' : '.');
+    document.getElementById('f-wb').textContent = nf0.format(d.weights.breakfast);
+    document.getElementById('f-wl').textContent = nf0.format(d.weights.lunch);
+    document.getElementById('f-wd').textContent = nf0.format(d.weights.dinner);
     document.getElementById('f-veg').textContent = nf2.format(d.veg_kg_per_day);
     document.getElementById('f-mixed').textContent = nf2.format(d.mixed_kg_per_day);
   }

@@ -7,7 +7,7 @@ den CO₂-Ausstoß pro Tag und Jahr im Empfangsbereich an.
 |---|---|---|
 | Erfassung | `http://<pi>:8080/erfassung` | Tablets an den Eingängen: Name → Verkehrsmittel (Passwort, einmalig pro Tablet) |
 | Anreise-Dashboard | `http://<pi>:8080/dashboard/anreise` | Empfang: CO₂ tatsächlich vs. „alle mit dem Auto“, Ø g CO₂/km, Beteiligung, Verkehrsmittel-Anteile, Strecke mit Vergleichen, Flug-Vergleich, Rekorde |
-| Verpflegungs-Dashboard | `http://<pi>:8080/dashboard/verpflegung` | CO₂ der vegetarischen Verpflegung vs. Mischkost (Pauschalwerte, mitlaufender Zähler), Bio-Anteil |
+| Verpflegungs-Dashboard | `http://<pi>:8080/dashboard/verpflegung` | CO₂ der vegetarischen Verpflegung vs. Mischkost (tagesgenau aus dem Essensplan, sonst Pauschale), Bio-Anteil |
 | PV-Dashboard | `http://<pi>:8080/dashboard/pv` | Sonnenstrom: aktuelle Leistung, Tagesverlauf, Jahresertrag, Eigenverbrauch, Einspeisung, vermiedenes CO₂ |
 | (Startseite) | `http://<pi>:8080/` | leitet zum Anreise-Dashboard weiter |
 | Verwaltung | `http://<pi>:8080/verwaltung` | Mitarbeitende, Strecken, Verkehrsmittel, Emissionsfaktoren, CSV-Export (Passwort) |
@@ -87,13 +87,42 @@ Das E-Auto wird genauso umgerechnet (70 × 1,4 ≈ 98 g/Pkm). Der Verbrenner-Wer
 
 ## Verpflegungs-Dashboard
 
-Pauschalwerte, einstellbar unter Verwaltung → „Verpflegung & Empfangsbildschirm“:
+### Essensplan (tagesgenau)
+
+Den monatlichen „Dienstplan Hauswirtschaft“ (Excel, .xlsx) unverändert unter Verwaltung →
+„Essensplan“ hochladen. Ablauf:
+
+1. **Hochladen und prüfen:** Monat, Jahr und die Zeilen Abreise, Frühstück, Mittagessen,
+   Abendessen werden anhand der Beschriftung gefunden. Der Import wird abgelehnt, wenn Monat
+   oder Jahr fehlen, Tage fehlen, die Wochentage nicht zum Kalender passen (falsch kopierte
+   Vorlage) oder eine Zelle keine ganze Zahl ≥ 0 enthält. Leere Zellen zählen als 0.
+2. **Vorschau:** Summen und alle Tage mit Lunchpaketen. Hinweise (kein Fehler) z. B. wenn die
+   Abendessen eines Tages nicht zum Frühstück am Folgetag passen. Noch nichts gespeichert.
+3. **Übernehmen:** Der Monat wird vollständig ersetzt. Bei Änderungen die Excel anpassen und
+   erneut hochladen; die Excel bleibt die einzige Quelle. Löschen setzt den Monat auf die
+   Pauschale zurück.
+
+Regeln:
+- Lunchpakete = Frühstück − Mittagessen (wer mittags im Haus isst, bekommt keins). Damit
+  bekommen auch Abreisende ohne Mittagessen ein Lunchpaket.
+- Nur Gäste; Essen der Mitarbeitenden (Reste) wird nicht gezählt.
+- Das Dashboard zählt nur Tage bis heute. Tage ohne Einträge im Planmonat zählen als 0.
+- CO₂ pro Mahlzeit = kg pro Verpflegungstag × Anteil der Mahlzeit: Frühstück 25 %,
+  Mittagessen/Lunchpaket 40 %, Abendessen 35 %. Die Anteile sind eine Annahme (grob nach
+  Kalorien), keine belastbare Quelle, und in der Verwaltung änderbar.
+
+### Pauschale (Monate ohne Essensplan)
+
+Einstellbar unter Verwaltung → „Verpflegung, Empfangsbildschirm & Datenschutz“:
 Übernachtungen mit Vollpension pro Jahr (Standard 20.000), geschlossene Monate (Standard
 Dezember), Bio-Anteil (Standard 50 %) und kg CO₂e pro Verpflegungstag. Der Jahreswert wird
-gleichmäßig auf die Öffnungstage verteilt und läuft als Zähler mit. Vergleich: vegetarisch
-3,81 kg vs. Mischkost mit mittlerem Fleischkonsum 5,63 kg CO₂e pro Tag (Scarborough u. a. 2014,
-*Climatic Change*, je 2.000 kcal). Für Bio wird bewusst kein CO₂-Vorteil angerechnet, da die
-Studienlage pro kg Lebensmittel uneinheitlich ist; angezeigt wird nur der Anteil.
+gleichmäßig auf die Öffnungstage verteilt (je Gast Frühstück, Lunchpaket, Abendessen). Im
+Dashboard steht in der Fußnote, welche Monate nach Plan und welche geschätzt sind.
+
+Vergleich: vegetarisch 3,81 kg vs. Mischkost mit mittlerem Fleischkonsum 5,63 kg CO₂e pro Tag
+(Scarborough u. a. 2014, *Climatic Change*, je 2.000 kcal). Für Bio wird bewusst kein
+CO₂-Vorteil angerechnet, da die Studienlage pro kg Lebensmittel uneinheitlich ist; angezeigt
+wird nur der Anteil.
 
 ## Empfangsbildschirm
 

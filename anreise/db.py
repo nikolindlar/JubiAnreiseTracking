@@ -40,6 +40,24 @@ CREATE TABLE IF NOT EXISTS settings (
     value TEXT NOT NULL
 );
 
+-- Verpflegung laut Dienstplan Hauswirtschaft (Excel-Import), Anzahl Gäste je
+-- Mahlzeit. Lunchpakete werden nicht gespeichert, sondern berechnet.
+CREATE TABLE IF NOT EXISTS meals (
+    day        TEXT PRIMARY KEY,             -- YYYY-MM-DD
+    breakfast  INTEGER NOT NULL DEFAULT 0,
+    lunch      INTEGER NOT NULL DEFAULT 0,
+    dinner     INTEGER NOT NULL DEFAULT 0,
+    departures INTEGER NOT NULL DEFAULT 0
+);
+
+-- Importierte Monate; nur diese Monate werden aus "meals" gerechnet, alle
+-- anderen pauschal
+CREATE TABLE IF NOT EXISTS meal_imports (
+    month       TEXT PRIMARY KEY,            -- YYYY-MM
+    filename    TEXT NOT NULL DEFAULT '',
+    imported_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS daily_totals (
     day        TEXT    NOT NULL,             -- YYYY-MM-DD
     mode_id    INTEGER NOT NULL REFERENCES modes(id),
@@ -92,6 +110,11 @@ DEFAULT_SETTINGS = {
     # kg CO2e pro Verpflegungstag (2.000 kcal), Scarborough u. a. 2014
     "meals_veg_kg_per_day": "3.81",       # vegetarisch
     "meals_mixed_kg_per_day": "5.63",     # mittlerer Fleischkonsum (50–99 g/Tag)
+    # Anteil der Mahlzeiten am Verpflegungstag in % (Annahme, grob nach Kalorien).
+    # Ein Lunchpaket zählt wie ein Mittagessen.
+    "meals_weight_breakfast": "25",
+    "meals_weight_lunch": "40",
+    "meals_weight_dinner": "35",
     # Empfangsbildschirm: Seitenwechsel in Sekunden, 0 = aus
     "screen_rotation_seconds": "30",
     # Datenschutz: Werte des laufenden Tages erst ab so vielen Anreisen zeigen
@@ -333,39 +356,134 @@ def closed_months(settings):
     return months
 
 
-def nutrition(settings, today):
-    """Mitlaufender Zähler: Jahreswert gleichmäßig auf die Öffnungstage verteilt."""
+MEAL_FIELDS = ("breakfast", "packs", "lunch", "dinner")
+
+
+def meal_weights(settings):
+    """Anteil je Mahlzeit am Verpflegungstag (Lunchpaket wie Mittagessen)."""
+    w = {}
+    for field in ("breakfast", "lunch", "dinner"):
+        try:
+            w[field] = max(0.0, float(settings.get(f"meals_weight_{field}") or 0)) / 100
+        except ValueError:
+            w[field] = 0.0
+    w["packs"] = w["lunch"]
+    return w
+
+
+def save_meal_plan(conn, plan, filename, now):
+    """Ersetzt einen Monat vollständig durch den importierten Plan."""
+    key = f"{plan['year']:04d}-{plan['month']:02d}"
+    with conn:
+        conn.execute("DELETE FROM meals WHERE day LIKE ?", (key + "-%",))
+        conn.executemany(
+            "INSERT INTO meals (day, breakfast, lunch, dinner, departures) VALUES (?, ?, ?, ?, ?)",
+            [(d["day"], d["breakfast"], d["lunch"], d["dinner"], d["departures"])
+             for d in plan["days"]])
+        conn.execute("INSERT INTO meal_imports (month, filename, imported_at) VALUES (?, ?, ?)"
+                     " ON CONFLICT(month) DO UPDATE SET filename = excluded.filename,"
+                     " imported_at = excluded.imported_at", (key, filename, now))
+    return key
+
+
+def delete_meal_month(conn, key):
+    with conn:
+        conn.execute("DELETE FROM meals WHERE day LIKE ?", (key + "-%",))
+        conn.execute("DELETE FROM meal_imports WHERE month = ?", (key,))
+
+
+def meal_days(conn, key):
+    return [dict(r) for r in conn.execute(
+        "SELECT day, breakfast, lunch, dinner, departures FROM meals WHERE day LIKE ? ORDER BY day",
+        (key + "-%",))]
+
+
+def meal_imports(conn):
+    return [dict(r) for r in conn.execute("SELECT * FROM meal_imports ORDER BY month DESC")]
+
+
+def nutrition(conn, settings, today):
+    """Mitlaufender Zähler. Monate mit importiertem Essensplan werden tagesgenau
+    gerechnet, alle anderen pauschal: Jahreswert gleichmäßig auf die
+    Öffnungstage verteilt (je Gast Frühstück, Lunchpaket und Abendessen)."""
     from datetime import date, timedelta
+    from .essensplan import lunch_packs
     closed = closed_months(settings)
     per_year = float(settings["meals_days_per_year"])
     veg = float(settings["meals_veg_kg_per_day"])
     mixed = float(settings["meals_mixed_kg_per_day"])
+    weights = meal_weights(settings)
+    year = today.year
 
-    day = date(today.year, 1, 1)
+    plan_months = {int(r["month"][5:]) for r in conn.execute(
+        "SELECT month FROM meal_imports WHERE month LIKE ?", (f"{year:04d}-%",))}
+    planned = {r["day"]: r for r in conn.execute(
+        "SELECT * FROM meals WHERE day LIKE ?", (f"{year:04d}-%",))}
+
+    day = date(year, 1, 1)
     open_total = open_to_date = 0
-    while day.year == today.year:
+    while day.year == year:
         if day.month not in closed:
             open_total += 1
             if day <= today:
                 open_to_date += 1
         day += timedelta(days=1)
-
     per_day = per_year / open_total if open_total else 0
-    days_to_date = per_day * open_to_date
+
+    to_date = dict.fromkeys(MEAL_FIELDS, 0.0)
+    whole_year = dict.fromkeys(MEAL_FIELDS, 0.0)
+    today_meals = None
+    estimated_to_date = False
+    day = date(year, 1, 1)
+    while day.year == year:
+        if day.month in plan_months:
+            r = planned.get(day.isoformat())
+            b, l, d = (r["breakfast"], r["lunch"], r["dinner"]) if r else (0, 0, 0)
+            m = {"breakfast": b, "packs": lunch_packs(b, l), "lunch": l, "dinner": d}
+            estimated = False
+        elif day.month not in closed:
+            m = {"breakfast": per_day, "packs": per_day, "lunch": 0, "dinner": per_day}
+            estimated = True
+        else:
+            m, estimated = None, False
+        if m:
+            for k in MEAL_FIELDS:
+                whole_year[k] += m[k]
+                if day <= today:
+                    to_date[k] += m[k]
+            if day <= today and estimated:
+                estimated_to_date = True
+        if day == today:
+            today_meals = dict(m, estimated=estimated) if m and sum(m.values()) else None
+        day += timedelta(days=1)
+
+    def equiv(m):  # Verpflegungstage (gewichtete Mahlzeiten)
+        return sum(m[k] * weights[k] for k in MEAL_FIELDS)
+
+    days_to_date = equiv(to_date)
+    year_days = equiv(whole_year)
     return {
-        "year": today.year,
-        "open_today": today.month not in closed,
+        "year": year,
+        "open_today": today_meals is not None,
+        "today": today_meals,
+        "plan_months": sorted(plan_months),
+        "estimated_to_date": estimated_to_date,
         "open_days_total": open_total,
         "open_days_to_date": open_to_date,
         "days_per_year": per_year,
         "days_per_open_day": per_day,
+        "meals_to_date": to_date,
+        "meal_count_to_date": sum(to_date.values()),
         "days_to_date": days_to_date,
         "veg_kg": days_to_date * veg,
         "mixed_kg": days_to_date * mixed,
         "saved_kg": days_to_date * (mixed - veg),
-        "year_saved_kg": per_year * (mixed - veg),
+        "year_meal_count": sum(whole_year.values()),
+        "year_days": year_days,
+        "year_saved_kg": year_days * (mixed - veg),
         "veg_kg_per_day": veg,
         "mixed_kg_per_day": mixed,
+        "weights": {k: v * 100 for k, v in weights.items()},
         "organic_share": float(settings["meals_organic_share"]),
     }
 

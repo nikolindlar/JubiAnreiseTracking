@@ -101,7 +101,7 @@ def test_arrival_aggregates_without_storing_name(app, client):
         conn = get_db()
         tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         assert tables == {"employees", "modes", "daily_totals", "settings",
-                          "pv_daily", "pv_samples", "pv_state"}
+                          "pv_daily", "pv_samples", "pv_state", "meals", "meal_imports"}
         cols = {r[1] for r in conn.execute("PRAGMA table_info(daily_totals)")}
         assert "employee_id" not in cols
 

@@ -262,3 +262,13 @@ button { font: inherit; cursor: pointer; }
 .admin form.settings label.inline { display: inline-block; margin: 0 12px 6px 0; }
 .admin fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 0 0 12px; padding: 8px 12px; }
 .admin code { background: var(--bg); padding: 1px 4px; border-radius: 4px; }
+
+/* Essensplan-Vorschau */
+.admin table.meal-days, .admin table.meal-sum { width: auto; }
+.admin table.meal-imports { margin-top: 16px; }
+.admin .meal-imports form { margin: 0; }
+.admin .meal-days td:not(:first-child), .admin .meal-sum td { text-align: right; }
+.admin .meal-days tr.weekend td:first-child { color: var(--muted); }
+.admin .warn-list { color: var(--danger); }
+.admin form.confirm { margin: 20px 0; display: flex; gap: 16px; align-items: center; }
+.admin button.primary { padding: 10px 20px; font-size: 1.05em; background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
