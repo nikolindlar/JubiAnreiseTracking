@@ -272,3 +272,7 @@ button { font: inherit; cursor: pointer; }
 .admin .warn-list { color: var(--danger); }
 .admin form.confirm { margin: 20px 0; display: flex; gap: 16px; align-items: center; }
 .admin button.primary { padding: 10px 20px; font-size: 1.05em; background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.admin .meal-sum tr.old td, .admin .meal-sum tr.old th { color: var(--muted); }
+.admin .meal-edit input { width: 4.5em; text-align: right; }
+.admin .meal-days tr.sum th { text-align: right; }
+.admin .ok { color: var(--accent); font-weight: 600; }

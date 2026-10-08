@@ -40,8 +40,8 @@
 
   <p class="footnote"><span id="f-source"></span>
     Pro Verpflegungstag (2.000 kcal): vegetarisch <span id="f-veg"></span> kg, Mischkost mit mittlerem
-    Fleischkonsum <span id="f-mixed"></span> kg CO₂e (Scarborough u. a. 2014), Anteile Frühstück
-    <span id="f-wb"></span> / Mittag oder Lunchpaket <span id="f-wl"></span> / Abend <span id="f-wd"></span> % (Annahme).
+    Fleischkonsum <span id="f-mixed"></span> kg CO₂e (Scarborough u. a. 2014), aufgeteilt auf die Mahlzeiten (Annahme:
+    <span id="f-weights"></span>).
     Flüge: einfache Strecke ab München, Näherung über Entfernung × 290 g/km (Inland) bzw. 210 g/km (Ausland).</p>
 </main>
 
@@ -78,7 +78,8 @@
     else if (t.estimated) today = 'heute rund <strong>' + nf0.format(t.breakfast) + ' Gäste</strong> (geschätzt)';
     else {
       var parts = [];
-      [['breakfast', 'Frühstück'], ['packs', 'Lunchpakete'], ['lunch', 'Mittagessen'], ['dinner', 'Abendessen']]
+      [['breakfast', 'Frühstück'], ['lunch', 'Mittagessen'], ['packs', 'Lunchpakete'], ['coffee', 'Kaffee'],
+       ['cake', 'Kuchen'], ['dinner', 'Abendessen'], ['snack', 'Brotzeit']]
         .forEach(function (p) { if (t[p[0]]) parts.push('<strong>' + nf0.format(t[p[0]]) + '</strong> ' + p[1]); });
       today = 'heute ' + parts.join(' · ');
     }
@@ -116,9 +117,10 @@
       ? 'Pauschalwerte: Übernachtungen mit Vollpension pro Jahr, gleichmäßig auf die Öffnungstage verteilt.'
       : 'Tagesgenau nach Essensplan (' + planned + ')' +
         (d.plan_months.length < 12 ? ', übrige Monate geschätzt.' : '.');
-    document.getElementById('f-wb').textContent = nf0.format(d.weights.breakfast);
-    document.getElementById('f-wl').textContent = nf0.format(d.weights.lunch);
-    document.getElementById('f-wd').textContent = nf0.format(d.weights.dinner);
+    var w = d.weights;
+    document.getElementById('f-weights').textContent = 'Frühstück ' + nf0.format(w.breakfast) +
+      ', Mittag ' + nf0.format(w.lunch) + ', Lunchpaket ' + nf0.format(w.packs) + ', Abend ' + nf0.format(w.dinner) +
+      ', Brotzeit ' + nf0.format(w.snack) + ', Kaffee ' + nf0.format(w.coffee) + ', Kuchen ' + nf0.format(w.cake) + ' %';
     document.getElementById('f-veg').textContent = nf2.format(d.veg_kg_per_day);
     document.getElementById('f-mixed').textContent = nf2.format(d.mixed_kg_per_day);
   }

@@ -86,9 +86,10 @@
   </table>
 
   <h2 id="essensplan">Essensplan (Verpflegung)</h2>
-  <p class="hint">Den monatlichen Dienstplan Hauswirtschaft unverändert als Excel-Datei (.xlsx) hochladen.
-    Vor dem Speichern erscheint eine Vorschau zur Kontrolle. Ein erneuter Upload desselben Monats ersetzt ihn vollständig,
-    z. B. nach kurzfristigen Änderungen. Monate ohne Essensplan rechnet das Dashboard mit den Pauschalwerten unten.</p>
+  <p class="hint">Den Hauswirtschafts-Monatsplan unverändert als Excel-Datei (.xlsx) hochladen, auch mit mehreren
+    Monaten als Blätter. Vor dem Speichern erscheint eine Vorschau zur Kontrolle. Einzelne Werte lassen sich danach unter
+    „Korrigieren“ ändern. Ein erneuter Upload desselben Monats ersetzt ihn vollständig, einschließlich der Korrekturen.
+    Monate ohne Essensplan rechnet das Dashboard mit den Pauschalwerten unten.</p>
   <form method="post" action="{{ url_for('meal_plan_upload') }}" enctype="multipart/form-data" class="settings">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <label>Excel-Datei <input type="file" name="plan" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required></label>
@@ -96,11 +97,13 @@
   </form>
   {% if meal_imports %}
   <table class="meal-imports">
-    <tr><th>Monat</th><th>Frühstück</th><th>Lunchpakete</th><th>Mittagessen</th><th>Abendessen</th><th>Importiert</th><th></th><th>Datei</th></tr>
+    <tr><th>Monat</th><th></th><th>Frühstück</th><th>Mittagessen</th><th>Lunchpakete</th><th>Kaffee/Kuchen</th><th>Abendessen</th><th>Brotzeit</th><th>Importiert</th><th>Korrigiert</th><th></th><th>Datei</th></tr>
     {% for m in meal_imports %}
     <tr>
-      <td>{{ m.label }}</td><td>{{ m.sum.breakfast }}</td><td>{{ m.sum.packs }}</td><td>{{ m.sum.lunch }}</td><td>{{ m.sum.dinner }}</td>
+      <td>{{ m.label }}</td><td><a href="{{ url_for('meal_plan_edit', month=m.month) }}">Korrigieren</a></td><td>{{ m.sum.breakfast }}</td><td>{{ m.sum.lunch }}</td><td>{{ m.sum.packs }}</td>
+      <td>{{ m.sum.coffee }} / {{ m.sum.cake }}</td><td>{{ m.sum.dinner }}</td><td>{{ m.sum.snack }}</td>
       <td>{{ m.imported_at[8:10] }}.{{ m.imported_at[5:7] }}.{{ m.imported_at[:4] }} {{ m.imported_at[11:16] }}</td>
+      <td>{% if m.corrected_at %}{{ m.corrected_at[8:10] }}.{{ m.corrected_at[5:7] }}.{{ m.corrected_at[:4] }} {{ m.corrected_at[11:16] }}{% endif %}</td>
       <td><form method="post" action="{{ url_for('meal_plan_delete', month=m.month) }}">
           <input type="hidden" name="csrf" value="{{ csrf }}">
           <button class="danger" onclick="return confirm('Essensplan {{ m.label }} löschen? Der Monat wird dann wieder pauschal gerechnet.')">Löschen</button>
@@ -136,12 +139,14 @@
       mittlerer Fleischkonsum, je 2.000 kcal.</p>
     <fieldset>
       <legend>Anteil der Mahlzeiten am Verpflegungstag in %</legend>
-      <label class="inline">Frühstück <input name="meals_weight_breakfast" value="{{ settings.meals_weight_breakfast }}" inputmode="decimal" size="4"></label>
-      <label class="inline">Mittagessen / Lunchpaket <input name="meals_weight_lunch" value="{{ settings.meals_weight_lunch }}" inputmode="decimal" size="4"></label>
-      <label class="inline">Abendessen <input name="meals_weight_dinner" value="{{ settings.meals_weight_dinner }}" inputmode="decimal" size="4"></label>
+      {% for f, name in [('breakfast', 'Frühstück'), ('lunch', 'Mittagessen'), ('packs', 'Lunchpaket'), ('dinner', 'Abendessen'),
+                         ('snack', 'Brotzeit'), ('coffee', 'Kaffee'), ('cake', 'Kuchen')] %}
+      <label class="inline">{{ name }} <input name="meals_weight_{{ f }}" value="{{ settings['meals_weight_' ~ f] }}" inputmode="decimal" size="4"></label>
+      {% endfor %}
     </fieldset>
-    <p class="hint">Damit werden die kg pro Verpflegungstag auf einzelne Mahlzeiten umgerechnet. Voreinstellung 25/40/35:
-      Annahme grob nach Kalorienanteilen, keine belastbare Quelle. Die Summe sollte 100 ergeben.</p>
+    <p class="hint">Damit werden die kg pro Verpflegungstag auf einzelne Mahlzeiten umgerechnet. Frühstück + Mittagessen
+      + Abendessen sollten 100 ergeben. Voreinstellungen sind Annahmen (grob nach Kalorien), keine belastbare Quelle.
+      Kaffee und Kuchen zählen im Vergleich „mit Fleisch“ gleich, sie bringen also keine Ersparnis.</p>
     <label>Seitenwechsel am Empfang alle … Sekunden (0 = aus)
       <input name="screen_rotation_seconds" value="{{ settings.screen_rotation_seconds }}" inputmode="numeric" size="4"></label>
     <p class="hint">Der Wechsel zwischen den Dashboards ist nur aktiv, wenn der Bildschirm die Adresse mit

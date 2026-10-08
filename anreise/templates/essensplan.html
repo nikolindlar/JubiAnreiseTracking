@@ -4,7 +4,7 @@
 {% block body %}
 <main>
   <header class="admin-head">
-    <h1>Essensplan {{ label or '' }}</h1>
+    <h1>Essensplan prüfen</h1>
     <nav><a href="{{ url_for('admin') }}#essensplan">Zurück zur Verwaltung</a></nav>
   </header>
 
@@ -12,45 +12,59 @@
   <p class="error"><strong>Die Datei{% if filename %} „{{ filename }}“{% endif %} konnte nicht übernommen werden.</strong><br>{{ error }}</p>
   <p><a href="{{ url_for('admin') }}#essensplan">Andere Datei hochladen</a></p>
   {% else %}
-  <p class="hint">Datei „{{ filename }}“. Bitte prüfen und dann übernehmen. Es ist noch nichts gespeichert.
-    {% if old_summary %}<strong>{{ label }} ist bereits importiert und wird vollständig ersetzt.</strong>{% endif %}</p>
+  <p class="hint">Datei „{{ filename }}“. Bitte prüfen und dann übernehmen. Es ist noch nichts gespeichert.</p>
 
+  {% for e in errors %}
+  <p class="error"><strong>Blatt „{{ e.sheet }}“ wird nicht übernommen:</strong> {{ e.error }}</p>
+  {% endfor %}
+
+  {% if plans %}
   <table class="meal-sum">
-    <tr><th></th><th>Frühstück</th><th>Lunchpakete</th><th>Mittagessen</th><th>Abendessen</th><th>Mahlzeiten</th><th>Abreisen</th></tr>
-    <tr><th>Neu</th><td>{{ summary.breakfast }}</td><td>{{ summary.packs }}</td><td>{{ summary.lunch }}</td>
-      <td>{{ summary.dinner }}</td><td><strong>{{ summary.meals }}</strong></td><td>{{ summary.departures }}</td></tr>
-    {% if old_summary %}
-    <tr><th>Bisher</th><td>{{ old_summary.breakfast }}</td><td>{{ old_summary.packs }}</td><td>{{ old_summary.lunch }}</td>
-      <td>{{ old_summary.dinner }}</td><td>{{ old_summary.meals }}</td><td>{{ old_summary.departures }}</td></tr>
+    <tr><th>Monat</th><th></th>{% for f, name in fields.items() %}<th>{{ name }}</th>{% endfor %}<th>Mahlzeiten</th></tr>
+    {% for p in plans %}
+    <tr><th>{{ p.label }}</th><td>{{ 'neu' if p.old_summary else '' }}</td>
+      {% for f in fields %}<td>{{ p.summary[f] }}</td>{% endfor %}<td><strong>{{ p.summary.meals }}</strong></td></tr>
+    {% if p.old_summary %}
+    <tr class="old"><th></th><td>bisher</td>
+      {% for f in fields %}<td>{{ p.old_summary[f] }}</td>{% endfor %}<td>{{ p.old_summary.meals }}</td></tr>
     {% endif %}
+    {% endfor %}
   </table>
 
-  {% if plan.warnings %}
-  <h2>Hinweise zur Prüfung</h2>
-  <p class="hint">Kein Fehler im Import, aber bitte kurz kontrollieren:</p>
-  <ul class="warn-list">{% for w in plan.warnings %}<li>{{ w }}</li>{% endfor %}</ul>
-  {% endif %}
+  {% for p in plans if p.old_summary %}
+  <p class="warn-list">{{ p.label }} ist bereits importiert und wird vollständig ersetzt.
+    {% if p.old_import and p.old_import.corrected_at %}<strong>Die manuellen Korrekturen vom
+    {{ p.old_import.corrected_at[8:10] }}.{{ p.old_import.corrected_at[5:7] }}.{{ p.old_import.corrected_at[:4] }} gehen dabei verloren.</strong>{% endif %}</p>
+  {% endfor %}
 
   <form method="post" action="{{ url_for('meal_plan_confirm') }}" class="confirm">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <input type="hidden" name="filename" value="{{ filename }}">
     <input type="hidden" name="data" value="{{ data }}">
-    <button class="primary">{{ label }} übernehmen</button>
+    <button class="primary">{{ plans|map(attribute='label')|join(' und ') }} übernehmen</button>
     <a href="{{ url_for('admin') }}#essensplan">Abbrechen</a>
   </form>
 
-  <h2>Tage</h2>
-  <p class="hint">Lunchpakete = Frühstück − Mittagessen (wer mittags im Haus isst, bekommt keins).</p>
+  {% for p in plans %}
+  <h2>{{ p.label }} <span class="hint small">(Blatt „{{ p.sheet }}“)</span></h2>
+  {% for n in p.notes %}<p class="hint">{{ n }}</p>{% endfor %}
+  {% if p.warnings %}
+  <p class="hint">Hinweise zur Prüfung (kein Fehler, bitte kurz kontrollieren):</p>
+  <ul class="warn-list">{% for w in p.warnings %}<li>{{ w }}</li>{% endfor %}</ul>
+  {% endif %}
   <table class="meal-days">
-    <tr><th>Tag</th><th>Frühstück</th><th>Lunchpakete</th><th>Mittagessen</th><th>Abendessen</th><th>Abreisen</th></tr>
-    {% for r in rows %}
+    <tr><th>Tag</th>{% for f, name in fields.items() %}<th>{{ name }}</th>{% endfor %}</tr>
+    {% for r in p.rows %}
     <tr class="{{ 'weekend' if r.weekday in ('Sa', 'So') }}">
       <td>{{ r.weekday }} {{ r.day[8:]|int }}.</td>
-      <td>{{ r.breakfast or '' }}</td><td>{{ r.packs or '' }}</td><td>{{ r.lunch or '' }}</td>
-      <td>{{ r.dinner or '' }}</td><td>{{ r.departures or '' }}</td>
+      {% for f in fields %}<td>{{ r[f] or '' }}</td>{% endfor %}
     </tr>
     {% endfor %}
   </table>
+  {% endfor %}
+  {% else %}
+  <p><a href="{{ url_for('admin') }}#essensplan">Andere Datei hochladen</a></p>
+  {% endif %}
   {% endif %}
 </main>
 {% endblock %}

@@ -89,27 +89,36 @@ Das E-Auto wird genauso umgerechnet (70 × 1,4 ≈ 98 g/Pkm). Der Verbrenner-Wer
 
 ### Essensplan (tagesgenau)
 
-Den monatlichen „Dienstplan Hauswirtschaft“ (Excel, .xlsx) unverändert unter Verwaltung →
-„Essensplan“ hochladen. Ablauf:
+Den Hauswirtschafts-Monatsplan (Excel, .xlsx) unverändert unter Verwaltung → „Essensplan“
+hochladen. Eine Datei darf mehrere Monate als Blätter enthalten. Ablauf:
 
-1. **Hochladen und prüfen:** Monat, Jahr und die Zeilen Abreise, Frühstück, Mittagessen,
-   Abendessen werden anhand der Beschriftung gefunden. Der Import wird abgelehnt, wenn Monat
-   oder Jahr fehlen, Tage fehlen, die Wochentage nicht zum Kalender passen (falsch kopierte
-   Vorlage) oder eine Zelle keine ganze Zahl ≥ 0 enthält. Leere Zellen zählen als 0.
-2. **Vorschau:** Summen und alle Tage mit Lunchpaketen. Hinweise (kein Fehler) z. B. wenn die
-   Abendessen eines Tages nicht zum Frühstück am Folgetag passen. Noch nichts gespeichert.
-3. **Übernehmen:** Der Monat wird vollständig ersetzt. Bei Änderungen die Excel anpassen und
-   erneut hochladen; die Excel bleibt die einzige Quelle. Löschen setzt den Monat auf die
-   Pauschale zurück.
+1. **Hochladen und prüfen:** Jedes sichtbare Blatt mit einer Tageszeile 1, 2, 3, … ist ein Monat.
+   - Monat: Feld „Monat:“, sonst aus dem Blattnamen (z. B. „Hauswirtschaftsplan Okt“).
+   - Jahr: Feld „Jahr:“, sonst Jahreszahl im Blattnamen, sonst aus den Wochentagen unter der
+     Tageszeile (Vorjahr, laufendes Jahr oder Folgejahr; eindeutig). Liegt das Jahr nicht im
+     laufenden Jahr, erscheint ein Hinweis.
+   - Zeilen über die Beschriftung in Spalte A: Anreise, Abreise, Frühstück, Mittagessen, Lunch,
+     Kaffee, Kuchen, Abendessen, Brotzeit. Pflicht: Frühstück, Mittagessen, Abendessen.
+     Leere Zellen zählen als 0.
+   - Ein Blatt wird abgelehnt, wenn Tage fehlen, die Wochentage nicht passen oder eine Zelle
+     keine ganze Zahl ≥ 0 enthält. Die übrigen Blätter lassen sich trotzdem übernehmen.
+   - Die ältere Vorlage „Dienstplan Hauswirtschaft“ ohne Zeile „Lunch“ wird weiter erkannt;
+     dort gilt Lunchpakete = Frühstück − Mittagessen.
+2. **Vorschau:** Summen je Monat und alle Tage. Hinweise (kein Fehler) z. B. bei mehr Abreisen
+   als Frühstück. Noch nichts gespeichert.
+3. **Übernehmen:** Die Monate werden vollständig ersetzt.
+4. **Korrigieren:** In der Liste der importierten Monate lassen sich einzelne Werte ohne neuen
+   Upload ändern. Ein späterer Upload desselben Monats überschreibt diese Korrekturen; die
+   Vorschau warnt davor.
 
 Regeln:
-- Lunchpakete = Frühstück − Mittagessen (wer mittags im Haus isst, bekommt keins). Damit
-  bekommen auch Abreisende ohne Mittagessen ein Lunchpaket.
 - Nur Gäste; Essen der Mitarbeitenden (Reste) wird nicht gezählt.
 - Das Dashboard zählt nur Tage bis heute. Tage ohne Einträge im Planmonat zählen als 0.
-- CO₂ pro Mahlzeit = kg pro Verpflegungstag × Anteil der Mahlzeit: Frühstück 25 %,
-  Mittagessen/Lunchpaket 40 %, Abendessen 35 %. Die Anteile sind eine Annahme (grob nach
-  Kalorien), keine belastbare Quelle, und in der Verwaltung änderbar.
+- CO₂ pro Mahlzeit = kg pro Verpflegungstag × Anteil der Mahlzeit. Voreinstellung: Frühstück
+  25 %, Mittagessen 40 %, Lunchpaket 40 %, Abendessen 35 %, Brotzeit 25 %, Kaffee 3 %,
+  Kuchen 8 %. Die Anteile sind Annahmen (grob nach Kalorien), keine belastbare Quelle, und in
+  der Verwaltung änderbar.
+- Kaffee und Kuchen zählen im Vergleich „mit Fleisch“ gleich, bringen also keine Ersparnis.
 
 ### Pauschale (Monate ohne Essensplan)
 
