@@ -256,7 +256,8 @@ def register_routes(app):
             " ORDER BY name COLLATE NOCASE").fetchall()
         modes = conn.execute(
             "SELECT id, label, icon FROM modes WHERE active = 1 ORDER BY sort").fetchall()
-        return render_template("kiosk.html", employees=employees, modes=modes)
+        notice = db.kiosk_notice(db.get_settings(conn), today())
+        return render_template("kiosk.html", employees=employees, modes=modes, notice=notice)
 
     @app.post("/api/anreise")
     @kiosk_required
@@ -323,6 +324,8 @@ def register_routes(app):
         collector = app.extensions.get("pv_collector")
         return render_template("admin.html", employees=employees, modes=modes,
                                settings=settings, closed=db.closed_months(settings),
+                               notice_active=db.kiosk_notice(settings, today()) is not None,
+                               notice_max=db.NOTICE_MAX_CHARS,
                                pv_status=pv_status(conn, collector), csrf=session["csrf"])
 
     @app.post("/verwaltung/mitarbeitende")
@@ -392,6 +395,23 @@ def register_routes(app):
                            f"{int(parse_float(f.get('privacy_min_trips_today'), 3))}")
         conn.commit()
         return redirect(url_for("admin") + "#einstellungen")
+
+    @app.post("/verwaltung/hinweis")
+    @admin_required
+    def notice_update():
+        conn = get_db()
+        text = (request.form.get("kiosk_notice") or "").replace("\r\n", "\n").strip()
+        until = (request.form.get("kiosk_notice_until") or "").strip()
+        try:
+            until = date.fromisoformat(until).isoformat() if until else ""
+        except ValueError:
+            until = ""
+        if request.form.get("action") == "delete":
+            text, until = "", ""
+        db.set_setting(conn, "kiosk_notice", text[:db.NOTICE_MAX_CHARS])
+        db.set_setting(conn, "kiosk_notice_until", until)
+        conn.commit()
+        return redirect(url_for("admin") + "#hinweis")
 
     @app.post("/verwaltung/pv")
     @admin_required

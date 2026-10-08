@@ -13,6 +13,9 @@
       <p class="hint">Noch keine Mitarbeitenden mit hinterlegter Strecke. Bitte in der Verwaltung pflegen.</p>
       {% endfor %}
     </div>
+    {% if notice %}
+    <aside class="notice" role="note"><span class="notice-icon" aria-hidden="true">📣</span><p>{{ notice }}</p></aside>
+    {% endif %}
   </section>
 
   <section id="step-mode" hidden>

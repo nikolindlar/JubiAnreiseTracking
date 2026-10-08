@@ -91,6 +91,10 @@ button { font: inherit; cursor: pointer; }
 .undo:active { background: var(--danger); color: #fff; border-color: var(--danger); }
 .finish { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
 .hint { color: var(--muted); }
+.notice { display: flex; gap: 16px; align-items: flex-start; margin-top: 32px; padding: 20px 24px;
+  background: var(--card); border: 2px solid var(--accent); border-radius: 16px; }
+.notice p { margin: 0; font-size: clamp(1.15rem, 2vw, 1.5rem); line-height: 1.45; white-space: pre-line; }
+.notice-icon { font-size: 2rem; line-height: 1; }
 
 /* ---------- Dashboards (Empfang) ---------- */
 .dashboard main { max-width: 1800px; padding-top: 14px; padding-bottom: 12px; }
@@ -230,6 +234,8 @@ button { font: inherit; cursor: pointer; }
 .error { color: var(--danger); }
 .admin form label { display: block; margin-bottom: 12px; }
 .admin form.settings { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; max-width: 640px; }
+.admin textarea { width: 100%; font: inherit; padding: 8px; background: var(--bg); color: var(--fg);
+  border: 1px solid var(--line); border-radius: 6px; margin-bottom: 12px; resize: vertical; }
 .admin form.settings label.inline { display: inline-block; margin: 0 12px 6px 0; }
 .admin fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 0 0 12px; padding: 8px 12px; }
 .admin code { background: var(--bg); padding: 1px 4px; border-radius: 4px; }
