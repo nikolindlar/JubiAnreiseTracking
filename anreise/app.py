@@ -1,6 +1,7 @@
 import hmac
 import io
 import csv
+import json
 import os
 import secrets
 import threading
@@ -11,7 +12,7 @@ from functools import wraps
 from flask import (Flask, Response, abort, g, jsonify, redirect, render_template,
                    request, session, url_for)
 
-from . import db, pv, vergleiche
+from . import db, essensplan, pv, vergleiche
 
 
 def create_app(config=None):
@@ -29,6 +30,7 @@ def create_app(config=None):
         UNDO_SECONDS=20,
         UNDO_GRACE_SECONDS=10,
         SESSION_COOKIE_SAMESITE="Lax",
+        MAX_CONTENT_LENGTH=5 * 1024 * 1024,  # Upload Essensplan
         TODAY=date.today,  # überschreibbar für Tests
         PV_COLLECTOR=True,      # Hintergrundabfrage des Wechselrichters
         PV_INTERVAL_SECONDS=60,
@@ -196,7 +198,7 @@ def register_routes(app):
 
     @app.get("/api/dashboard/verpflegung")
     def api_nutrition():
-        data = db.nutrition(db.get_settings(get_db()), today())
+        data = db.nutrition(get_db(), db.get_settings(get_db()), today())
         data["compare"] = vergleiche.vergleich(data["saved_kg"] * 1000, vergleiche.FLUEGE)
         return jsonify(data)
 
@@ -326,7 +328,116 @@ def register_routes(app):
                                settings=settings, closed=db.closed_months(settings),
                                notice_active=db.kiosk_notice(settings, today()) is not None,
                                notice_max=db.NOTICE_MAX_CHARS,
-                               pv_status=pv_status(conn, collector), csrf=session["csrf"])
+                               pv_status=pv_status(conn, collector),
+                               meal_imports=meal_import_list(conn), csrf=session["csrf"])
+
+    def meal_import_list(conn):
+        return [dict(imp, label=essensplan.month_label(imp["month"]),
+                     sum=essensplan.summary(db.meal_days(conn, imp["month"])))
+                for imp in db.meal_imports(conn)]
+
+    def with_weekdays(days):
+        names = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
+        return [dict(d, weekday=names[date.fromisoformat(d["day"]).weekday()]) for d in days]
+
+    def now_iso():
+        return datetime.now().isoformat(timespec="minutes")
+
+    def month_key(month):
+        try:
+            datetime.strptime(month, "%Y-%m")
+        except ValueError:
+            abort(404)
+        return month
+
+    @app.post("/verwaltung/essensplan")
+    @admin_required
+    def meal_plan_upload():
+        upload = request.files.get("plan")
+        filename = os.path.basename((upload.filename or "") if upload else "")[:200]
+        if not upload or not filename:
+            return render_template("essensplan.html", error="Bitte eine Datei auswählen.",
+                                   fields=essensplan.FIELD_NAMES, csrf=session["csrf"])
+        try:
+            sheets = essensplan.parse(io.BytesIO(upload.read()), today())
+        except essensplan.PlanError as exc:
+            return render_template("essensplan.html", error=str(exc), filename=filename,
+                                   fields=essensplan.FIELD_NAMES, csrf=session["csrf"])
+        conn = get_db()
+        plans = []
+        for sheet in sheets:
+            plan = sheet.get("plan")
+            if plan:
+                old = db.meal_days(conn, plan["key"])
+                plan.update(sheet=sheet["sheet"], rows=with_weekdays(plan["days"]), summary=essensplan.summary(plan["days"]),
+                            old_summary=essensplan.summary(old) if old else None,
+                            old_import=db.meal_import(conn, plan["key"]))
+                plans.append(plan)
+        plans.sort(key=lambda p: p["key"])
+        data = [{k: p[k] for k in ("year", "month", "days")} for p in plans]
+        return render_template(
+            "essensplan.html", sheets=sheets, plans=plans, filename=filename,
+            errors=[s for s in sheets if "error" in s], fields=essensplan.FIELD_NAMES,
+            data=json.dumps(data) if plans else "", csrf=session["csrf"])
+
+    @app.post("/verwaltung/essensplan/uebernehmen")
+    @admin_required
+    def meal_plan_confirm():
+        try:
+            plans = essensplan.validate(json.loads(request.form.get("data", "")))
+        except ValueError:
+            plans = None
+        if not plans:
+            abort(400)
+        filename = (request.form.get("filename") or "")[:200]
+        conn = get_db()
+        for plan in plans:
+            db.save_meal_plan(conn, plan, filename, now_iso())
+        return redirect(url_for("admin") + "#essensplan")
+
+    @app.route("/verwaltung/essensplan/<month>", methods=["GET", "POST"])
+    @admin_required
+    def meal_plan_edit(month):
+        key = month_key(month)
+        conn = get_db()
+        imp = db.meal_import(conn, key)
+        if not imp:
+            abort(404)
+        days = db.meal_days(conn, key)
+        error = message = None
+        if request.method == "POST":
+            new_days, bad = [], []
+            for d in days:
+                entry = {"day": d["day"]}
+                for field in essensplan.FIELDS:
+                    raw = request.form.get(f"{d['day']}_{field}", "")
+                    value = essensplan.as_int(raw)
+                    if value is None:
+                        bad.append(f"{essensplan.FIELD_NAMES[field]} am {int(d['day'][8:])}.")
+                        value = raw
+                    entry[field] = value
+                new_days.append(entry)
+            if bad:
+                error = ("Nicht gespeichert, ungültige Werte (nur ganze Zahlen ≥ 0): " + ", ".join(bad))
+                days = new_days
+            else:
+                changed = db.correct_meal_days(conn, key, new_days, now_iso())
+                return redirect(url_for("meal_plan_edit", month=key, geaendert=changed))
+        elif "geaendert" in request.args:
+            n = request.args.get("geaendert", 0, type=int)
+            message = f"Gespeichert, {n} Wert{'e' if n != 1 else ''} geändert." if n else "Keine Änderungen."
+        return render_template("essensplan_bearbeiten.html", imp=imp, key=key,
+                               label=essensplan.month_label(key), rows=with_weekdays(days),
+                               fields=essensplan.FIELD_NAMES, summary=essensplan.summary(
+                                   [d for d in days if all(isinstance(d[f], int) for f in essensplan.FIELDS)]),
+                               warnings=[] if error else essensplan.check(days),
+                               error=error, message=message, csrf=session["csrf"])
+
+    @app.post("/verwaltung/essensplan/<month>/loeschen")
+    @admin_required
+    def meal_plan_delete(month):
+        db.delete_meal_month(get_db(), month_key(month))
+        return redirect(url_for("admin") + "#essensplan")
 
     @app.post("/verwaltung/mitarbeitende")
     @admin_required
@@ -385,6 +496,10 @@ def register_routes(app):
                        f"{min(100.0, parse_float(f.get('meals_organic_share'))):g}")
         db.set_setting(conn, "meals_veg_kg_per_day", f"{parse_float(f.get('meals_veg_kg_per_day')):g}")
         db.set_setting(conn, "meals_mixed_kg_per_day", f"{parse_float(f.get('meals_mixed_kg_per_day')):g}")
+        for meal in essensplan.MEALS:
+            key = f"meals_weight_{meal}"
+            if f.get(key) is not None:
+                db.set_setting(conn, key, f"{min(100.0, parse_float(f.get(key))):g}")
         months = [str(m) for m in range(1, 13) if f.get(f"closed_{m}")]
         if len(months) == 12:  # mindestens ein Monat muss geöffnet sein
             months = months[:-1]

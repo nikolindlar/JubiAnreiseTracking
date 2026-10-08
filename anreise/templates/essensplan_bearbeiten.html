@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Essensplan {{ label }} korrigieren{% endblock %}
+{% block bodyclass %}admin{% endblock %}
+{% block body %}
+<main>
+  <header class="admin-head">
+    <h1>Essensplan {{ label }} korrigieren</h1>
+    <nav><a href="{{ url_for('admin') }}#essensplan">Zurück zur Verwaltung</a></nav>
+  </header>
+
+  <p class="hint">Importiert aus „{{ imp.filename }}“.
+    {% if imp.corrected_at %}Zuletzt manuell korrigiert am {{ imp.corrected_at[8:10] }}.{{ imp.corrected_at[5:7] }}.{{ imp.corrected_at[:4] }}
+    um {{ imp.corrected_at[11:16] }} Uhr.{% endif %}
+    Leere Felder zählen als 0. Ein neuer Upload desselben Monats überschreibt diese Korrekturen.</p>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  {% if message %}<p class="ok">{{ message }}</p>{% endif %}
+  {% if warnings %}
+  <p class="hint">Hinweise zur Prüfung:</p>
+  <ul class="warn-list">{% for w in warnings %}<li>{{ w }}</li>{% endfor %}</ul>
+  {% endif %}
+
+  <form method="post" class="meal-edit">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <p><button class="primary">Speichern</button></p>
+    <table class="meal-days">
+      <tr><th>Tag</th>{% for f, name in fields.items() %}<th>{{ name }}</th>{% endfor %}</tr>
+      {% for r in rows %}
+      <tr class="{{ 'weekend' if r.weekday in ('Sa', 'So') }}">
+        <td>{{ r.weekday }} {{ r.day[8:]|int }}.</td>
+        {% for f in fields %}
+        <td><input name="{{ r.day }}_{{ f }}" value="{{ r[f] if r[f] != 0 else '' }}" inputmode="numeric"
+                   size="4" aria-label="{{ fields[f] }} {{ r.day[8:]|int }}."></td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+      <tr class="sum"><th>Summe</th>{% for f in fields %}<th>{{ summary[f] }}</th>{% endfor %}</tr>
+    </table>
+    <p><button class="primary">Speichern</button></p>
+  </form>
+</main>
+{% endblock %}

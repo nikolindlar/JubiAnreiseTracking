@@ -7,7 +7,7 @@ den CO₂-Ausstoß pro Tag und Jahr im Empfangsbereich an.
 |---|---|---|
 | Erfassung | `http://<pi>:8080/erfassung` | Tablets an den Eingängen: Name → Verkehrsmittel (Passwort, einmalig pro Tablet) |
 | Anreise-Dashboard | `http://<pi>:8080/dashboard/anreise` | Empfang: CO₂ tatsächlich vs. „alle mit dem Auto“, Ø g CO₂/km, Beteiligung, Verkehrsmittel-Anteile, Strecke mit Vergleichen, Flug-Vergleich, Rekorde |
-| Verpflegungs-Dashboard | `http://<pi>:8080/dashboard/verpflegung` | CO₂ der vegetarischen Verpflegung vs. Mischkost (Pauschalwerte, mitlaufender Zähler), Bio-Anteil |
+| Verpflegungs-Dashboard | `http://<pi>:8080/dashboard/verpflegung` | CO₂ der vegetarischen Verpflegung vs. Mischkost (tagesgenau aus dem Essensplan, sonst Pauschale), Bio-Anteil |
 | PV-Dashboard | `http://<pi>:8080/dashboard/pv` | Sonnenstrom: aktuelle Leistung, Tagesverlauf, Jahresertrag, Eigenverbrauch, Einspeisung, vermiedenes CO₂ |
 | (Startseite) | `http://<pi>:8080/` | leitet zum Anreise-Dashboard weiter |
 | Verwaltung | `http://<pi>:8080/verwaltung` | Mitarbeitende, Strecken, Verkehrsmittel, Emissionsfaktoren, CSV-Export (Passwort) |
@@ -87,13 +87,51 @@ Das E-Auto wird genauso umgerechnet (70 × 1,4 ≈ 98 g/Pkm). Der Verbrenner-Wer
 
 ## Verpflegungs-Dashboard
 
-Pauschalwerte, einstellbar unter Verwaltung → „Verpflegung & Empfangsbildschirm“:
+### Essensplan (tagesgenau)
+
+Den Hauswirtschafts-Monatsplan (Excel, .xlsx) unverändert unter Verwaltung → „Essensplan“
+hochladen. Eine Datei darf mehrere Monate als Blätter enthalten. Ablauf:
+
+1. **Hochladen und prüfen:** Jedes sichtbare Blatt mit einer Tageszeile 1, 2, 3, … ist ein Monat.
+   - Monat: Feld „Monat:“, sonst aus dem Blattnamen (z. B. „Hauswirtschaftsplan Okt“).
+   - Jahr: Feld „Jahr:“, sonst Jahreszahl im Blattnamen, sonst aus den Wochentagen unter der
+     Tageszeile (Vorjahr, laufendes Jahr oder Folgejahr; eindeutig). Liegt das Jahr nicht im
+     laufenden Jahr, erscheint ein Hinweis.
+   - Zeilen über die Beschriftung in Spalte A: Anreise, Abreise, Frühstück, Mittagessen, Lunch,
+     Kaffee, Kuchen, Abendessen, Brotzeit. Pflicht: Frühstück, Mittagessen, Abendessen.
+     Leere Zellen zählen als 0.
+   - Ein Blatt wird abgelehnt, wenn Tage fehlen, die Wochentage nicht passen oder eine Zelle
+     keine ganze Zahl ≥ 0 enthält. Die übrigen Blätter lassen sich trotzdem übernehmen.
+   - Die ältere Vorlage „Dienstplan Hauswirtschaft“ ohne Zeile „Lunch“ wird weiter erkannt;
+     dort gilt Lunchpakete = Frühstück − Mittagessen.
+2. **Vorschau:** Summen je Monat und alle Tage. Hinweise (kein Fehler) z. B. bei mehr Abreisen
+   als Frühstück. Noch nichts gespeichert.
+3. **Übernehmen:** Die Monate werden vollständig ersetzt.
+4. **Korrigieren:** In der Liste der importierten Monate lassen sich einzelne Werte ohne neuen
+   Upload ändern. Ein späterer Upload desselben Monats überschreibt diese Korrekturen; die
+   Vorschau warnt davor.
+
+Regeln:
+- Nur Gäste; Essen der Mitarbeitenden (Reste) wird nicht gezählt.
+- Das Dashboard zählt nur Tage bis heute. Tage ohne Einträge im Planmonat zählen als 0.
+- CO₂ pro Mahlzeit = kg pro Verpflegungstag × Anteil der Mahlzeit. Voreinstellung: Frühstück
+  25 %, Mittagessen 40 %, Lunchpaket 40 %, Abendessen 35 %, Brotzeit 25 %, Kaffee 3 %,
+  Kuchen 8 %. Die Anteile sind Annahmen (grob nach Kalorien), keine belastbare Quelle, und in
+  der Verwaltung änderbar.
+- Kaffee und Kuchen zählen im Vergleich „mit Fleisch“ gleich, bringen also keine Ersparnis.
+
+### Pauschale (Monate ohne Essensplan)
+
+Einstellbar unter Verwaltung → „Verpflegung, Empfangsbildschirm & Datenschutz“:
 Übernachtungen mit Vollpension pro Jahr (Standard 20.000), geschlossene Monate (Standard
 Dezember), Bio-Anteil (Standard 50 %) und kg CO₂e pro Verpflegungstag. Der Jahreswert wird
-gleichmäßig auf die Öffnungstage verteilt und läuft als Zähler mit. Vergleich: vegetarisch
-3,81 kg vs. Mischkost mit mittlerem Fleischkonsum 5,63 kg CO₂e pro Tag (Scarborough u. a. 2014,
-*Climatic Change*, je 2.000 kcal). Für Bio wird bewusst kein CO₂-Vorteil angerechnet, da die
-Studienlage pro kg Lebensmittel uneinheitlich ist; angezeigt wird nur der Anteil.
+gleichmäßig auf die Öffnungstage verteilt (je Gast Frühstück, Lunchpaket, Abendessen). Im
+Dashboard steht in der Fußnote, welche Monate nach Plan und welche geschätzt sind.
+
+Vergleich: vegetarisch 3,81 kg vs. Mischkost mit mittlerem Fleischkonsum 5,63 kg CO₂e pro Tag
+(Scarborough u. a. 2014, *Climatic Change*, je 2.000 kcal). Für Bio wird bewusst kein
+CO₂-Vorteil angerechnet, da die Studienlage pro kg Lebensmittel uneinheitlich ist; angezeigt
+wird nur der Anteil.
 
 ## Empfangsbildschirm
 

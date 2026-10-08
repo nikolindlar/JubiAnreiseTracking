@@ -40,6 +40,30 @@ CREATE TABLE IF NOT EXISTS settings (
     value TEXT NOT NULL
 );
 
+-- Verpflegung laut Hauswirtschafts-Monatsplan (Excel-Import, in der Verwaltung
+-- korrigierbar), Anzahl Gäste je Mahlzeit
+CREATE TABLE IF NOT EXISTS meals (
+    day        TEXT PRIMARY KEY,             -- YYYY-MM-DD
+    arrivals   INTEGER NOT NULL DEFAULT 0,
+    departures INTEGER NOT NULL DEFAULT 0,
+    breakfast  INTEGER NOT NULL DEFAULT 0,
+    lunch      INTEGER NOT NULL DEFAULT 0,   -- Mittagessen im Haus
+    packs      INTEGER NOT NULL DEFAULT 0,   -- Lunchpakete
+    coffee     INTEGER NOT NULL DEFAULT 0,
+    cake       INTEGER NOT NULL DEFAULT 0,
+    dinner     INTEGER NOT NULL DEFAULT 0,
+    snack      INTEGER NOT NULL DEFAULT 0    -- Brotzeit
+);
+
+-- Importierte Monate; nur diese Monate werden aus "meals" gerechnet, alle
+-- anderen pauschal
+CREATE TABLE IF NOT EXISTS meal_imports (
+    month        TEXT PRIMARY KEY,           -- YYYY-MM
+    filename     TEXT NOT NULL DEFAULT '',
+    imported_at  TEXT NOT NULL,
+    corrected_at TEXT NOT NULL DEFAULT ''    -- letzte manuelle Korrektur
+);
+
 CREATE TABLE IF NOT EXISTS daily_totals (
     day        TEXT    NOT NULL,             -- YYYY-MM-DD
     mode_id    INTEGER NOT NULL REFERENCES modes(id),
@@ -92,6 +116,16 @@ DEFAULT_SETTINGS = {
     # kg CO2e pro Verpflegungstag (2.000 kcal), Scarborough u. a. 2014
     "meals_veg_kg_per_day": "3.81",       # vegetarisch
     "meals_mixed_kg_per_day": "5.63",     # mittlerer Fleischkonsum (50–99 g/Tag)
+    # Anteil der Mahlzeiten am Verpflegungstag in % (Annahme, grob nach Kalorien).
+    # Ein Lunchpaket zählt wie ein Mittagessen.
+    # Kaffee und Kuchen sind in beiden Szenarien gleich (keine Ersparnis).
+    "meals_weight_breakfast": "25",
+    "meals_weight_lunch": "40",
+    "meals_weight_packs": "40",
+    "meals_weight_dinner": "35",
+    "meals_weight_snack": "25",            # Brotzeit
+    "meals_weight_coffee": "3",
+    "meals_weight_cake": "8",
     # Empfangsbildschirm: Seitenwechsel in Sekunden, 0 = aus
     "screen_rotation_seconds": "30",
     # Datenschutz: Werte des laufenden Tages erst ab so vielen Anreisen zeigen
@@ -126,6 +160,15 @@ def init_db(conn):
         conn.execute(f"ALTER TABLE modes ADD COLUMN {col} INTEGER NOT NULL DEFAULT 0")
     if new_cols:
         apply_default_flags(conn)
+    # Essensplan: neue Spalten (Vorlage mit Lunch, Kaffee, Kuchen, Brotzeit)
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(meals)")}
+    for col in ("arrivals", "packs", "coffee", "cake", "snack"):
+        if col not in cols:
+            conn.execute(f"ALTER TABLE meals ADD COLUMN {col} INTEGER NOT NULL DEFAULT 0")
+    if "packs" not in cols:
+        conn.execute("UPDATE meals SET packs = MAX(0, breakfast - lunch)")
+    if "corrected_at" not in {r["name"] for r in conn.execute("PRAGMA table_info(meal_imports)")}:
+        conn.execute("ALTER TABLE meal_imports ADD COLUMN corrected_at TEXT NOT NULL DEFAULT ''")
     if conn.execute("SELECT COUNT(*) FROM modes").fetchone()[0] == 0:
         for sort, (label, icon, factor, source, baseline) in enumerate(DEFAULT_MODES):
             conn.execute(
@@ -333,39 +376,168 @@ def closed_months(settings):
     return months
 
 
-def nutrition(settings, today):
-    """Mitlaufender Zähler: Jahreswert gleichmäßig auf die Öffnungstage verteilt."""
+# Mahlzeiten ohne Fleisch-Alternative: zählen in beiden Szenarien gleich
+NO_MEAT_ALTERNATIVE = ("coffee", "cake")
+
+
+def meal_weights(settings):
+    """Anteil je Mahlzeit am Verpflegungstag (0–1)."""
+    from .essensplan import MEALS
+    w = {}
+    for field in MEALS:
+        try:
+            w[field] = max(0.0, float(settings.get(f"meals_weight_{field}") or 0)) / 100
+        except ValueError:
+            w[field] = 0.0
+    return w
+
+
+def save_meal_plan(conn, plan, filename, now):
+    """Ersetzt einen Monat vollständig (auch manuelle Korrekturen)."""
+    from .essensplan import FIELDS
+    key = f"{plan['year']:04d}-{plan['month']:02d}"
+    with conn:
+        conn.execute("DELETE FROM meals WHERE day LIKE ?", (key + "-%",))
+        conn.executemany(
+            f"INSERT INTO meals (day, {', '.join(FIELDS)}) VALUES (?{', ?' * len(FIELDS)})",
+            [(d["day"], *(d[f] for f in FIELDS)) for d in plan["days"]])
+        conn.execute("INSERT INTO meal_imports (month, filename, imported_at, corrected_at)"
+                     " VALUES (?, ?, ?, '') ON CONFLICT(month) DO UPDATE SET"
+                     " filename = excluded.filename, imported_at = excluded.imported_at,"
+                     " corrected_at = ''", (key, filename, now))
+    return key
+
+
+def correct_meal_days(conn, key, days, now):
+    """Übernimmt manuell korrigierte Tageswerte. Gibt die Zahl geänderter Werte zurück."""
+    from .essensplan import FIELDS
+    old = {d["day"]: d for d in meal_days(conn, key)}
+    changed = 0
+    with conn:
+        for d in days:
+            before = old.get(d["day"])
+            diff = [f for f in FIELDS if before is None or before[f] != d[f]]
+            if not diff:
+                continue
+            changed += len(diff)
+            conn.execute(f"INSERT INTO meals (day, {', '.join(FIELDS)}) VALUES (?{', ?' * len(FIELDS)})"
+                         " ON CONFLICT(day) DO UPDATE SET " +
+                         ", ".join(f"{f} = excluded.{f}" for f in FIELDS),
+                         (d["day"], *(d[f] for f in FIELDS)))
+        if changed:
+            conn.execute("UPDATE meal_imports SET corrected_at = ? WHERE month = ?", (now, key))
+    return changed
+
+
+def delete_meal_month(conn, key):
+    with conn:
+        conn.execute("DELETE FROM meals WHERE day LIKE ?", (key + "-%",))
+        conn.execute("DELETE FROM meal_imports WHERE month = ?", (key,))
+
+
+def meal_days(conn, key):
+    from .essensplan import FIELDS
+    return [dict(r) for r in conn.execute(
+        f"SELECT day, {', '.join(FIELDS)} FROM meals WHERE day LIKE ? ORDER BY day", (key + "-%",))]
+
+
+def meal_imports(conn):
+    return [dict(r) for r in conn.execute("SELECT * FROM meal_imports ORDER BY month DESC")]
+
+
+def meal_import(conn, key):
+    r = conn.execute("SELECT * FROM meal_imports WHERE month = ?", (key,)).fetchone()
+    return dict(r) if r else None
+
+
+def nutrition(conn, settings, today):
+    """Mitlaufender Zähler. Monate mit importiertem Essensplan werden tagesgenau
+    gerechnet, alle anderen pauschal: Jahreswert gleichmäßig auf die
+    Öffnungstage verteilt (je Gast Frühstück, Lunchpaket und Abendessen)."""
     from datetime import date, timedelta
+    from .essensplan import MEALS
     closed = closed_months(settings)
     per_year = float(settings["meals_days_per_year"])
     veg = float(settings["meals_veg_kg_per_day"])
     mixed = float(settings["meals_mixed_kg_per_day"])
+    weights = meal_weights(settings)
+    year = today.year
 
-    day = date(today.year, 1, 1)
+    plan_months = {int(r["month"][5:]) for r in conn.execute(
+        "SELECT month FROM meal_imports WHERE month LIKE ?", (f"{year:04d}-%",))}
+    planned = {r["day"]: r for r in conn.execute(
+        "SELECT * FROM meals WHERE day LIKE ?", (f"{year:04d}-%",))}
+
+    day = date(year, 1, 1)
     open_total = open_to_date = 0
-    while day.year == today.year:
+    while day.year == year:
         if day.month not in closed:
             open_total += 1
             if day <= today:
                 open_to_date += 1
         day += timedelta(days=1)
-
     per_day = per_year / open_total if open_total else 0
-    days_to_date = per_day * open_to_date
+    zero = dict.fromkeys(MEALS, 0)
+
+    to_date = dict.fromkeys(MEALS, 0.0)
+    whole_year = dict.fromkeys(MEALS, 0.0)
+    today_meals = None
+    estimated_to_date = False
+    day = date(year, 1, 1)
+    while day.year == year:
+        if day.month in plan_months:
+            r = planned.get(day.isoformat())
+            m = {k: r[k] for k in MEALS} if r else dict(zero)
+            estimated = False
+        elif day.month not in closed:
+            m = dict(zero, breakfast=per_day, packs=per_day, dinner=per_day)
+            estimated = True
+        else:
+            m, estimated = None, False
+        if m:
+            for k in MEALS:
+                whole_year[k] += m[k]
+                if day <= today:
+                    to_date[k] += m[k]
+            if day <= today and estimated:
+                estimated_to_date = True
+        if day == today:
+            today_meals = dict(m, estimated=estimated) if m and sum(m.values()) else None
+        day += timedelta(days=1)
+
+    def equiv(m, fields):  # Verpflegungstage (gewichtete Mahlzeiten)
+        return sum(m[k] * weights[k] for k in fields)
+
+    main = [k for k in MEALS if k not in NO_MEAT_ALTERNATIVE]
+
+    def co2(m):
+        same = equiv(m, NO_MEAT_ALTERNATIVE) * veg
+        return equiv(m, main) * veg + same, equiv(m, main) * mixed + same
+
+    veg_kg, mixed_kg = co2(to_date)
+    year_veg, year_mixed = co2(whole_year)
     return {
-        "year": today.year,
-        "open_today": today.month not in closed,
+        "year": year,
+        "open_today": today_meals is not None,
+        "today": today_meals,
+        "plan_months": sorted(plan_months),
+        "estimated_to_date": estimated_to_date,
         "open_days_total": open_total,
         "open_days_to_date": open_to_date,
         "days_per_year": per_year,
         "days_per_open_day": per_day,
-        "days_to_date": days_to_date,
-        "veg_kg": days_to_date * veg,
-        "mixed_kg": days_to_date * mixed,
-        "saved_kg": days_to_date * (mixed - veg),
-        "year_saved_kg": per_year * (mixed - veg),
+        "meals_to_date": to_date,
+        "meal_count_to_date": sum(to_date.values()),
+        "days_to_date": equiv(to_date, MEALS),
+        "veg_kg": veg_kg,
+        "mixed_kg": mixed_kg,
+        "saved_kg": mixed_kg - veg_kg,
+        "year_meal_count": sum(whole_year.values()),
+        "year_days": equiv(whole_year, MEALS),
+        "year_saved_kg": year_mixed - year_veg,
         "veg_kg_per_day": veg,
         "mixed_kg_per_day": mixed,
+        "weights": {k: v * 100 for k, v in weights.items()},
         "organic_share": float(settings["meals_organic_share"]),
     }
 
