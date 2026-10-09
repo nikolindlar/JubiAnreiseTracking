@@ -1,0 +1,12 @@
+[project]
+name = "jubianreisetracking"
+version = "0.1.0"
+author = "Niko Lindlar"
+description = "A tool to track and plot sustainability related data"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "flask>=3.0,<4",
+    "openpyxl>=3.1,<4",
+    "waitress>=3.0,<4",
+]
