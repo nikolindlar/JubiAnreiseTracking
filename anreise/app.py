@@ -234,6 +234,31 @@ def register_routes(app):
         }
         return jsonify(data)
 
+    def now_iso():
+        return datetime.now().isoformat(timespec="minutes")
+
+    # ---------- Selbsteintragung (geheimer Link, keine Anmeldung) ----------
+    def check_signup_token(token):
+        expected = db.get_settings(get_db()).get("signup_token", "")
+        if not expected or not hmac.compare_digest(token.encode(), expected.encode()):
+            abort(404)
+
+    @app.route("/eintragen/<token>", methods=["GET", "POST"])
+    def signup(token):
+        check_signup_token(token)
+        error, done = None, None
+        name = " ".join((request.form.get("name") or "").split())
+        km_raw = (request.form.get("distance_km") or "").strip()
+        if request.method == "POST":
+            km = parse_float(km_raw, None) if km_raw else None
+            error = db.add_employee_self(get_db(), name, km, now_iso())
+            if not error:
+                return redirect(url_for("signup", token=token, fertig=name))
+        elif request.args.get("fertig"):
+            done = request.args["fertig"][:db.NAME_MAX_CHARS]
+        return render_template("eintragen.html", error=error, done=done, name=name, km=km_raw,
+                               name_max=db.NAME_MAX_CHARS, km_max=db.DISTANCE_MAX_KM)
+
     # ---------- Erfassung (Tablets) ----------
     @app.route("/erfassung/login", methods=["GET", "POST"])
     def kiosk_login():
@@ -329,7 +354,9 @@ def register_routes(app):
                                notice_active=db.kiosk_notice(settings, today()) is not None,
                                notice_max=db.NOTICE_MAX_CHARS,
                                pv_status=pv_status(conn, collector),
-                               meal_imports=meal_import_list(conn), csrf=session["csrf"])
+                               meal_imports=meal_import_list(conn),
+                               signup_url=url_for("signup", token=settings["signup_token"], _external=True),
+                               csrf=session["csrf"])
 
     def meal_import_list(conn):
         return [dict(imp, label=essensplan.month_label(imp["month"]),
@@ -339,9 +366,6 @@ def register_routes(app):
     def with_weekdays(days):
         names = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
         return [dict(d, weekday=names[date.fromisoformat(d["day"]).weekday()]) for d in days]
-
-    def now_iso():
-        return datetime.now().isoformat(timespec="minutes")
 
     def month_key(month):
         try:
@@ -510,6 +534,14 @@ def register_routes(app):
                            f"{int(parse_float(f.get('privacy_min_trips_today'), 3))}")
         conn.commit()
         return redirect(url_for("admin") + "#einstellungen")
+
+    @app.post("/verwaltung/eintragen-link")
+    @admin_required
+    def signup_link_renew():
+        conn = get_db()
+        db.set_setting(conn, "signup_token", db.new_signup_token())
+        conn.commit()
+        return redirect(url_for("admin") + "#eintragen")
 
     @app.post("/verwaltung/hinweis")
     @admin_required

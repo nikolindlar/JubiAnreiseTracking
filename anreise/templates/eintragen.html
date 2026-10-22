@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Für die Anreise eintragen{% endblock %}
+{% block head %}<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">{% endblock %}
+{% block bodyclass %}signup{% endblock %}
+{% block body %}
+<main>
+  <h1>Für die Anreise eintragen</h1>
+  {% if done %}
+  <p class="signup-done">Danke! <strong>{{ done }}</strong> erscheint ab sofort auf dem Tablet am Eingang.</p>
+  <p class="hint">Falls Name oder Strecke korrigiert werden müssen, sag bitte der Verwaltung Bescheid.</p>
+  <p><a href="{{ request.path }}">Weitere Person eintragen</a></p>
+  {% else %}
+  <p class="hint">Dein Eintrag erscheint auf dem Tablet am Eingang. Dort tippst du jeden Tag deinen Namen und dein
+    Verkehrsmittel an.</p>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  <form method="post">
+    <label for="name">Welcher Name soll angezeigt werden?</label>
+    <input id="name" name="name" value="{{ name }}" maxlength="{{ name_max }}" required autocomplete="off"
+           autocapitalize="words" {{ 'autofocus' if not error }}>
+    <p class="hint small">Gerne auch ein Spitzname. Er ist auf dem Tablet für alle sichtbar.</p>
+
+    <label for="km">Wie weit fährst du jeden Tag? Hin- und Rückfahrt, in km</label>
+    <input id="km" name="distance_km" value="{{ km }}" inputmode="decimal" required autocomplete="off"
+           placeholder="z. B. 24">
+    <p class="hint small">Beispiel: 12 km einfache Strecke = 24 km.</p>
+
+    <button class="primary">Eintragen</button>
+  </form>
+  <p class="hint small">Gespeichert werden nur der Name und die Strecke. Welches Verkehrsmittel du an einem Tag nimmst,
+    wird nicht mit deinem Namen gespeichert, sondern nur als Tagessumme aller Anreisen.</p>
+  {% endif %}
+</main>
+{% endblock %}

@@ -15,7 +15,8 @@ CREATE TABLE IF NOT EXISTS employees (
     id          INTEGER PRIMARY KEY,
     name        TEXT    NOT NULL,
     distance_km REAL    NOT NULL DEFAULT 0,  -- Gesamtstrecke Hin + Rück
-    active      INTEGER NOT NULL DEFAULT 1
+    active      INTEGER NOT NULL DEFAULT 1,
+    self_added  TEXT    NOT NULL DEFAULT ''  -- Zeitpunkt der Selbsteintragung, leer = Verwaltung
 );
 
 CREATE TABLE IF NOT EXISTS modes (
@@ -160,6 +161,8 @@ def init_db(conn):
         conn.execute(f"ALTER TABLE modes ADD COLUMN {col} INTEGER NOT NULL DEFAULT 0")
     if new_cols:
         apply_default_flags(conn)
+    if "self_added" not in {r["name"] for r in conn.execute("PRAGMA table_info(employees)")}:
+        conn.execute("ALTER TABLE employees ADD COLUMN self_added TEXT NOT NULL DEFAULT ''")
     # Essensplan: neue Spalten (Vorlage mit Lunch, Kaffee, Kuchen, Brotzeit)
     cols = {r["name"] for r in conn.execute("PRAGMA table_info(meals)")}
     for col in ("arrivals", "packs", "coffee", "cake", "snack"):
@@ -179,10 +182,39 @@ def init_db(conn):
         apply_default_flags(conn)
     for key, value in DEFAULT_SETTINGS.items():
         conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (key, value))
+    if not get_settings(conn).get("signup_token"):
+        set_setting(conn, "signup_token", new_signup_token())
     if conn.execute("SELECT COUNT(*) FROM employees").fetchone()[0] == 0:
         for name, km in DEFAULT_EMPLOYEES:
             conn.execute("INSERT INTO employees (name, distance_km) VALUES (?, ?)", (name, km))
     conn.commit()
+
+
+def new_signup_token():
+    import secrets
+    return secrets.token_urlsafe(9)
+
+
+# Selbsteintragung durch Mitarbeitende
+NAME_MAX_CHARS = 30
+DISTANCE_MAX_KM = 400
+
+
+def add_employee_self(conn, name, km, now):
+    """Legt einen Eintrag von der Selbsteintragungs-Seite an.
+    Gibt eine Fehlermeldung zurück oder None bei Erfolg."""
+    if not name:
+        return "Bitte einen Namen eingeben."
+    if len(name) > NAME_MAX_CHARS:
+        return f"Der Name darf höchstens {NAME_MAX_CHARS} Zeichen lang sein."
+    if km is None or not 0 < km <= DISTANCE_MAX_KM:
+        return f"Bitte die Strecke als Zahl zwischen 0 und {DISTANCE_MAX_KM} km eingeben."
+    if conn.execute("SELECT 1 FROM employees WHERE name = ? COLLATE NOCASE", (name,)).fetchone():
+        return "Diesen Namen gibt es schon. Bitte einen anderen wählen, z. B. mit Initial."
+    conn.execute("INSERT INTO employees (name, distance_km, active, self_added) VALUES (?, ?, 1, ?)",
+                 (name, round(km, 1), now))
+    conn.commit()
+    return None
 
 
 def apply_default_flags(conn):
