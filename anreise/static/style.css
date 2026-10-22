@@ -276,3 +276,18 @@ button { font: inherit; cursor: pointer; }
 .admin .meal-edit input { width: 4.5em; text-align: right; }
 .admin .meal-days tr.sum th { text-align: right; }
 .admin .ok { color: var(--accent); font-weight: 600; }
+
+/* Selbsteintragung (Mitarbeitende) */
+.signup main { max-width: 480px; }
+.signup h1 { font-size: 1.6rem; margin: 0 0 8px; }
+.signup label { display: block; font-weight: 600; font-size: 1.1rem; margin: 20px 0 6px; }
+.signup input { width: 100%; font: inherit; font-size: 1.2rem; padding: 12px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--card); color: var(--fg); }
+.signup .small { font-size: .9rem; margin: 6px 0 0; }
+.signup button.primary { margin-top: 24px; width: 100%; padding: 14px; font: inherit; font-size: 1.15rem;
+  font-weight: 600; border: 0; border-radius: 10px; background: var(--accent); color: var(--accent-fg); }
+.signup .signup-done { font-size: 1.2rem; }
+.signup a { color: var(--accent); }
+.admin .badge { font-size: .8em; padding: 1px 6px; border-radius: 6px; background: var(--warn-bg); margin-left: 6px; }
+.admin .link-box { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.admin .link-box code { user-select: all; word-break: break-all; padding: 6px 8px; }

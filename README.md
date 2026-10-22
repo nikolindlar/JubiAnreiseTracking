@@ -10,6 +10,7 @@ den CO₂-Ausstoß pro Tag und Jahr im Empfangsbereich an.
 | Verpflegungs-Dashboard | `http://<pi>:8080/dashboard/verpflegung` | CO₂ der vegetarischen Verpflegung vs. Mischkost (tagesgenau aus dem Essensplan, sonst Pauschale), Bio-Anteil |
 | PV-Dashboard | `http://<pi>:8080/dashboard/pv` | Sonnenstrom: aktuelle Leistung, Tagesverlauf, Jahresertrag, Eigenverbrauch, Einspeisung, vermiedenes CO₂ |
 | (Startseite) | `http://<pi>:8080/` | leitet zum Anreise-Dashboard weiter |
+| Selbsteintragung | `http://<pi>:8080/eintragen/<code>` | Mitarbeitende tragen Name (gern Spitzname) und Strecke selbst ein. Geheimer Link aus der Verwaltung, kein Passwort |
 | Verwaltung | `http://<pi>:8080/verwaltung` | Mitarbeitende, Strecken, Verkehrsmittel, Emissionsfaktoren, CSV-Export (Passwort) |
 
 ## Datenschutz – was gespeichert wird
@@ -198,6 +199,21 @@ Namensauswahl. „Rückgängig“ storniert die Buchung, „Fertig“ springt so
 Namensauswahl (für die nächste Person). Auf der Verkehrsmittel-Seite geht es nach
 20 s ohne Eingabe ebenfalls zurück zur Namensauswahl. Die Seite und lädt sich alle 15 Minuten neu, damit Änderungen aus der
 Verwaltung ankommen.
+
+## Selbsteintragung durch Mitarbeitende
+
+Unter Verwaltung → Mitarbeitende → „Link zum Selbsteintragen“ steht ein Link mit einem
+zufälligen Code (z. B. `http://<pi>:8080/eintragen/fJ0H0I_g9wER`). Diesen an die Mitarbeitenden
+geben, z. B. per Mail oder Aushang mit QR-Code.
+
+- Die Seite fragt nur „Welcher Name soll angezeigt werden?“ und „Wie weit fährst du jeden Tag?
+  Hin- und Rückfahrt, in km“. Spitznamen sind ausdrücklich erwünscht.
+- Sie kann nur neue Einträge anlegen, nichts anzeigen oder ändern. Doppelte Namen werden
+  abgelehnt (Groß-/Kleinschreibung egal), Strecke 0–400 km, Name höchstens 30 Zeichen.
+- Neue Einträge erscheinen sofort auf dem Tablet und sind in der Verwaltung als „selbst
+  eingetragen“ markiert. Korrekturen und Löschen nur in der Verwaltung.
+- Wer den Link kennt, kann Namen anlegen. Ist er in falsche Hände geraten: „Neuen Link
+  erzeugen“, der alte Link liefert dann „nicht gefunden“.
 
 ## Hinweis auf dem Tablet
 
