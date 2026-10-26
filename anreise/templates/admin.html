@@ -32,7 +32,8 @@
   </form>
 
   <h2>Mitarbeitende</h2>
-  <p class="hint">Strecke = Gesamtstrecke Hin- und Rückweg in km. Nur aktive Personen mit Strecke &gt; 0 erscheinen auf dem Tablet.</p>
+  <p class="hint">Strecke = Gesamtstrecke Hin- und Rückweg in km. Nur aktive Personen mit Strecke &gt; 0 erscheinen auf dem Tablet.
+    Selbst eingetragene Personen sind markiert und erscheinen sofort; Name und Strecke hier bei Bedarf korrigieren.</p>
   <table>
     <tr><th>Name</th><th>Strecke (km, hin+zurück)</th><th>Aktiv</th><th></th></tr>
     {% for e in employees %}
@@ -42,7 +43,8 @@
           <input type="hidden" name="csrf" value="{{ csrf }}"></form>
         <input form="{{ f }}" name="name" value="{{ e.name }}" required></td>
       <td><input form="{{ f }}" name="distance_km" value="{{ '%g' % e.distance_km }}" inputmode="decimal" size="6">
-        {% if e.distance_km <= 0 %}<span class="warn">Strecke fehlt</span>{% endif %}</td>
+        {% if e.distance_km <= 0 %}<span class="warn">Strecke fehlt</span>{% endif %}
+        {% if e.self_added %}<span class="badge" title="selbst eingetragen am {{ e.self_added[8:10] }}.{{ e.self_added[5:7] }}.{{ e.self_added[:4] }} {{ e.self_added[11:16] }}">selbst eingetragen {{ e.self_added[8:10] }}.{{ e.self_added[5:7] }}.</span>{% endif %}</td>
       <td><input form="{{ f }}" type="checkbox" name="active" {{ 'checked' if e.active }}></td>
       <td>
         <button form="{{ f }}" name="action" value="save">Speichern</button>
@@ -60,6 +62,19 @@
       <td><button form="emp-new">Hinzufügen</button></td>
     </tr>
   </table>
+
+  <h3 id="eintragen">Link zum Selbsteintragen</h3>
+  <p class="hint">Über diesen Link tragen sich Mitarbeitende selbst ein (Name oder Spitzname und Strecke), ohne Passwort.
+    Die Seite kann nur neue Namen anlegen, nichts ändern oder anzeigen. Nur an Mitarbeitende weitergeben, z. B. per Mail.
+    Wenn der Link in falsche Hände geraten ist: neuen Link erzeugen, der alte funktioniert dann nicht mehr.
+    Wird die Verwaltung über eine andere Adresse aufgerufen als die Mitarbeitenden nutzen (z. B. <code>localhost</code>),
+    den Anfang durch die Adresse des Pi ersetzen.</p>
+  <form method="post" action="{{ url_for('signup_link_renew') }}" class="link-box">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <code id="signup-url">{{ signup_url }}</code>
+    <button type="button" id="signup-copy">Kopieren</button>
+    <button class="danger" onclick="return confirm('Neuen Link erzeugen? Der bisherige Link funktioniert dann nicht mehr.')">Neuen Link erzeugen</button>
+  </form>
 
   <h2>Verkehrsmittel &amp; Emissionsfaktoren</h2>
   <p class="hint">Faktor in g CO₂-Äquivalente pro Personenkilometer. Änderungen gelten nur für neue Anreisen – bereits erfasste Werte bleiben unverändert.
@@ -182,4 +197,20 @@
     <button>Speichern</button>
   </form>
 </main>
+<script>
+document.getElementById('signup-copy').addEventListener('click', function () {
+  var btn = this, el = document.getElementById('signup-url');
+  // Zwischenablage gibt es nur über https oder localhost, sonst den Link markieren
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(el.textContent).then(function () { btn.textContent = 'Kopiert'; });
+  } else {
+    var range = document.createRange();
+    range.selectNodeContents(el);
+    var sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    btn.textContent = 'Markiert – mit Strg+C kopieren';
+  }
+});
+</script>
 {% endblock %}
